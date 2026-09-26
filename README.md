@@ -1,0 +1,4102 @@
+<title>Brain and Mind Academy Assessment</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js for Graphical Representations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  
+  <!-- html2pdf.js for Client-Side PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- FontAwesome Icons -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Outfit', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F1F5F9;
+      color: #0F172A;
+    }
+    
+    .tab-content-enter {
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Fixed A4 Geometry for Export & Print */
+    .report-page {
+      width: 100%;
+      max-width: 820px;
+      min-height: 1140px;
+      height: 1140px;
+      margin: 0 auto 24px auto;
+      background: #ffffff;
+      padding: 36px 40px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Applied only while html2pdf is capturing the container. The 24px gap between
+       .report-page blocks (used for a nice scroll view on screen) is not aware of
+       the A4 page boundaries html2pdf computes, so over 20 pages it drifts and
+       produces stray blank/half pages in the exported PDF. Zeroing the gap during
+       capture keeps every page locked to a clean 1140px slice. */
+    #dossier-print-container.export-mode .report-page {
+      margin: 0 auto !important;
+    }
+
+    .cover-gradient-bg {
+      background: radial-gradient(circle at 50% 30%, #1E3A8A 0%, #0F1E36 60%, #080D1A 100%);
+      position: relative;
+    }
+
+    .neural-grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.6;
+    }
+
+    @media print {
+      body { background-color: #FFFFFF !important; margin: 0 !important; padding: 0 !important; }
+      .no-print { display: none !important; }
+      .report-page {
+        box-shadow: none !important; border: none !important; margin: 0 !important;
+        padding: 30px 36px !important; width: 100% !important; min-height: 100vh !important;
+        height: 100vh !important; page-break-after: always !important; break-after: page !important;
+      }
+    }
+  </style>
+<div id="app-shell" class="min-h-screen flex flex-col justify-between">
+
+  <!-- Header Navigation -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 no-print shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchMainTab('overview')">
+        <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-sm">
+          <i class="fa-solid fa-brain text-amber-400 text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-display font-extrabold text-lg text-slate-900 tracking-tight leading-none">
+              Brain and Mind Academy
+            </span>
+          </div>
+          <p class="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">
+            B&amp;M — The Experts
+          </p>
+        </div>
+      </div>
+
+      <!-- Action Controls -->
+      <div class="flex items-center gap-2 flex-wrap justify-end">
+        <span id="save-status" class="hidden"></span>
+        <button id="btn-portal" class="hidden px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold items-center gap-1.5 transition flex">
+          <i class="fa-solid fa-table-list"></i><span>My assessments</span>
+        </button>
+        <div id="acct-chip" class="hidden items-center gap-2 pl-1 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-full">
+          <img id="acct-chip-img" alt="" class="w-6 h-6 rounded-full">
+          <span id="acct-chip-name" class="text-[11px] font-bold text-slate-700 max-w-[120px] truncate"></span>
+        </div>
+        <button onclick="downloadFullPDFReport()" id="btn-main-pdf-dl" data-pdf-btn class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-md">
+          <i class="fa-solid fa-lock pdf-lock"></i><i class="fa-solid fa-file-arrow-down"></i>
+          <span>Download Complete PDF</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step Navigation Bar -->
+    <div id="step-nav" class="bg-slate-100/90 border-t border-slate-200 overflow-x-auto">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center space-x-1 py-1.5 min-w-max">
+        <button id="tab-nav-overview" onclick="switchMainTab('overview')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs">
+          <i class="fa-solid fa-circle-info text-blue-600"></i><span>1. Overview</span>
+        </button>
+        <button id="tab-nav-profile" onclick="switchMainTab('profile')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-id-card text-indigo-500"></i><span>2. Profile</span>
+        </button>
+        <button id="tab-nav-mi" onclick="switchMainTab('mi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-brain text-purple-600"></i><span>3. MI (64 Qs)</span>
+        </button>
+        <button id="tab-nav-vak" onclick="switchMainTab('vak')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-eye text-emerald-600"></i><span>4. VAK (47 Qs)</span>
+        </button>
+        <button id="tab-nav-brain" onclick="switchMainTab('brain')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-scale-balanced text-sky-600"></i><span>5. Brain (21 Pairs)</span>
+        </button>
+        <button id="tab-nav-report" onclick="switchMainTab('report')" class="px-4 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 shadow-sm">
+          <i class="fa-solid fa-book-open"></i><span>6. Full Dossier</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Narrated video modal (introduction / report walkthrough) -->
+  <div id="video-modal" hidden class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center px-4" style="padding-top:max(16px, env(safe-area-inset-top, 0px));padding-bottom:max(16px, env(safe-area-inset-bottom, 0px));" role="dialog" aria-modal="true" aria-labelledby="video-modal-title">
+    <div class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col" style="max-height:100%;">
+      <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <div id="video-modal-eyebrow" class="text-[10px] font-bold uppercase tracking-wider text-blue-600"></div>
+          <h2 id="video-modal-title" class="text-base font-bold font-display text-slate-900 leading-tight"></h2>
+        </div>
+        <i class="fa-solid fa-film text-slate-300 text-lg"></i>
+      </div>
+      <div class="relative bg-[#0B1B3A]" style="height:min(560px, 66vh);">
+        <div id="video-host-intro" class="absolute inset-0"></div>
+        <div id="video-host-walk" class="absolute inset-0" hidden></div>
+      </div>
+      <div class="h-1 bg-slate-100"><div id="video-modal-bar" class="h-full bg-amber-400 transition-all duration-500" style="width:0%"></div></div>
+      <div class="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p id="video-modal-status" class="text-xs font-semibold text-slate-500"></p>
+          <p id="video-modal-note" hidden class="text-[11px] font-semibold text-amber-700 mt-0.5"><i class="fa-solid fa-volume-xmark"></i> This browser isn't playing the voice, so please read along with the captions. The video still counts as watched.</p>
+        </div>
+        <div class="flex items-center gap-2 justify-end">
+          <button id="video-modal-close" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold">Close</button>
+          <button id="video-modal-primary" disabled class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-2"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ======================================================== -->
+  <!-- SIGN-IN & SAVED ASSESSMENTS PORTAL                        -->
+  <!-- ======================================================== -->
+  <section id="portal" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+
+    <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div class="neural-grid-overlay"></div>
+      <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div class="max-w-2xl">
+          <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-3 border border-white/15">
+            <i class="fa-solid fa-lock text-amber-400"></i> Candidate sign-in
+          </span>
+          <h1 id="portal-greeting" class="text-2xl sm:text-3xl font-black font-display tracking-tight leading-tight mb-2">Checking your sign-in…</h1>
+          <p id="portal-sub" class="text-slate-300 text-sm leading-relaxed">
+            Your answers save automatically as you go. Close the page at any time and pick up from the same question later.
+          </p>
+        </div>
+        <div class="flex flex-col items-start md:items-end gap-3 shrink-0">
+          <div id="portal-account" class="hidden items-center gap-2.5 bg-white/10 border border-white/15 rounded-2xl pl-1.5 pr-4 py-1.5">
+            <img id="portal-avatar" alt="" class="w-8 h-8 rounded-full bg-white/20">
+            <div class="leading-tight">
+              <div id="portal-account-name" class="text-xs font-bold"></div>
+              <div id="portal-account-role" class="text-[10px] text-slate-300 font-semibold uppercase tracking-wider"></div>
+            </div>
+          </div>
+          <button id="btn-new-attempt" disabled class="px-5 py-3 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 disabled:cursor-wait text-white font-bold rounded-xl text-xs shadow-lg flex items-center gap-2 transition">
+            <i class="fa-solid fa-plus"></i><span>Start a new assessment</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shown when progress cannot be saved in this view -->
+    <div id="portal-offline" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0"><i class="fa-solid fa-user-lock"></i></div>
+      <div class="flex-grow">
+        <h3 class="text-sm font-bold text-amber-950">Progress can't be saved here</h3>
+        <p class="text-xs text-amber-900/80 leading-relaxed">To save and resume, open this page while signed in to your Claude account, using the link that was shared with you. You can still take the assessment now, but closing the page will lose your answers.</p>
+      </div>
+      <button id="btn-continue-unsaved" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shrink-0">Continue without saving</button>
+    </div>
+
+    <!-- Summary tiles (tracker) -->
+    <div id="portal-stats" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+    <!-- Assessment list -->
+    <div id="portal-list-card" class="hidden bg-white rounded-3xl border border-slate-200 shadow-sm">
+      <div class="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h2 id="portal-list-title" class="text-lg font-bold font-display text-slate-900">Your assessments</h2>
+          <p id="portal-list-sub" class="text-xs text-slate-500">Resume where you left off, or open a finished dossier.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div id="portal-scope" class="hidden bg-slate-100 rounded-xl p-1 text-xs font-bold">
+            <button data-scope="all" class="scope-btn px-3 py-1 rounded-lg">Everyone</button>
+            <button data-scope="mine" class="scope-btn px-3 py-1 rounded-lg">Started by me</button>
+          </div>
+          <label for="portal-search" class="sr-only">Search candidates</label>
+          <input id="portal-search" type="search" placeholder="Search name, class or school" class="w-56 max-w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[720px]">
+          <thead>
+            <tr class="text-[10px] uppercase tracking-wider text-slate-500 text-left">
+              <th class="px-5 sm:px-6 py-2.5 font-bold">Candidate</th>
+              <th class="px-3 py-2.5 font-bold col-account hidden">Account</th>
+              <th class="px-3 py-2.5 font-bold">Progress</th>
+              <th class="px-3 py-2.5 font-bold">Status</th>
+              <th class="px-3 py-2.5 font-bold">Last saved</th>
+              <th class="px-5 sm:px-6 py-2.5 font-bold text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="portal-rows" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+      <div id="portal-empty" class="hidden px-6 py-10 text-center">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3"><i class="fa-solid fa-clipboard-list text-lg"></i></div>
+        <h3 class="text-sm font-bold text-slate-900 mb-1">No assessments yet</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">Start a new assessment to begin. Every answer is saved to this account, so it can be finished across several sittings.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Container -->
+  <main id="app-main" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+    <div id="viewing-banner" class="hidden mb-5 bg-sky-50 border border-sky-200 rounded-2xl px-4 py-3 flex items-center gap-3 text-xs text-sky-900">
+      <i class="fa-solid fa-eye text-sky-600"></i><span id="viewing-banner-text" class="font-semibold"></span>
+    </div>
+
+    <!-- SLIDE 1: OVERVIEW -->
+    <section id="tab-panel-overview" class="tab-content-enter space-y-6">
+      <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+        <div class="relative z-10 max-w-3xl">
+          <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold uppercase tracking-wider mb-4 border border-white/15">
+            <i class="fa-solid fa-compass text-amber-400"></i> Integrated Cognitive Diagnostic
+          </span>
+          <h1 class="text-3xl sm:text-4xl font-black font-display tracking-tight leading-tight mb-3">
+            Brain and Mind Academy Psychometric Evaluation Suite
+          </h1>
+          <p class="text-slate-300 text-sm leading-relaxed mb-4">
+            Complete the 3-step diagnostic assessment covering Howard Gardner's <strong>Multiple Intelligences</strong>, <strong>VAK Sensory Processing</strong>, and <strong>Cerebral Hemispheric Dominance</strong> to generate your comprehensive 20-page customized PDF report. Every selection is recorded with auditory feedback and turns green upon choice.
+          </p>
+          <div class="inline-flex items-start gap-2.5 bg-amber-400/10 border border-amber-300/30 rounded-xl px-4 py-3 mb-6 max-w-2xl">
+            <i class="fa-solid fa-circle-info text-amber-300 mt-0.5"></i>
+            <p class="text-xs text-amber-100 leading-relaxed">
+              <strong>This is a diagnostic self-assessment, not a test.</strong> There are no right or wrong answers, no pass or fail, and no time limit. Its only purpose is to help you understand how you naturally think, learn and process information.
+            </p>
+          </div>
+          <div>
+            <button onclick="switchMainTab('profile')" class="px-5 py-3 bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl text-xs shadow-lg flex items-center gap-2 transition">
+              <span>Begin with Candidate Details</span>
+              <i class="fa-solid fa-arrow-right text-xs"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- About / What is being measured -->
+      <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <h2 class="text-lg font-bold font-display text-slate-900 mb-1">What This Assessment Measures</h2>
+        <p class="text-xs text-slate-500 mb-5 max-w-3xl leading-relaxed">
+          The suite combines three well-established, independent frameworks so the final report reflects a rounded picture of the student's cognitive profile rather than a single score.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl">
+            <div class="w-9 h-9 rounded-lg bg-purple-600 text-white flex items-center justify-center mb-2"><i class="fa-solid fa-brain"></i></div>
+            <h3 class="text-sm font-bold text-purple-950 mb-1">1. Multiple Intelligences</h3>
+            <p class="text-[11px] text-slate-600 leading-relaxed mb-1.5">64 statements across 8 sections (A–H), rated on how true each one feels for you.</p>
+            <span class="text-[10px] font-bold text-purple-700">~15–18 minutes</span>
+          </div>
+          <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
+            <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center mb-2"><i class="fa-solid fa-eye"></i></div>
+            <h3 class="text-sm font-bold text-emerald-950 mb-1">2. VAK Learning Style</h3>
+            <p class="text-[11px] text-slate-600 leading-relaxed mb-1.5">47 real-life scenarios — pick the option (A, B or C) that best matches your instinctive reaction.</p>
+            <span class="text-[10px] font-bold text-emerald-700">~12–15 minutes</span>
+          </div>
+          <div class="p-4 bg-sky-50/70 border border-sky-200 rounded-2xl">
+            <div class="w-9 h-9 rounded-lg bg-sky-600 text-white flex items-center justify-center mb-2"><i class="fa-solid fa-scale-balanced"></i></div>
+            <h3 class="text-sm font-bold text-sky-950 mb-1">3. Brain Dominance</h3>
+            <p class="text-[11px] text-slate-600 leading-relaxed mb-1.5">21 paired statements — choose the one (A or B) that sounds more like you.</p>
+            <span class="text-[10px] font-bold text-sky-700">~8–10 minutes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- How and when to attempt -->
+      <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <h2 class="text-lg font-bold font-display text-slate-900 mb-1">How &amp; When to Attempt This Assessment</h2>
+        <p class="text-xs text-slate-500 mb-5 max-w-3xl leading-relaxed">
+          Follow these guidelines so the results genuinely reflect the student's natural tendencies rather than a rushed or overthought response.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-xs">
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-clock text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>Best time:</strong> a calm, unhurried moment — not right before or after an exam, and not when tired or distracted.</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-mug-hot text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>Environment:</strong> a quiet space, free of interruptions, so responses aren't influenced by others.</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-bolt text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>Go with your first instinct.</strong> The first answer that comes to mind is usually the most accurate — avoid overanalyzing each statement.</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-user-check text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>Answer as yourself, not as you'd like to be seen.</strong> There is no "ideal" profile — every combination has real strengths.</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-hourglass-half text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>No time limit,</strong> but try to finish all three sections in one sitting (roughly 35–45 minutes total) for consistent context.</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-rotate text-blue-600 mt-0.5"></i>
+            <p class="text-slate-700"><strong>It can be retaken later</strong> — every 1–2 years is reasonable — to see how interests and preferences evolve over time.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: CANDIDATE PROFILE FORM -->
+    <section id="tab-panel-profile" class="hidden tab-content-enter">
+      <div class="max-w-2xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="pb-4 mb-5 border-b border-slate-100">
+          <h2 class="text-xl font-bold font-display text-slate-900">Student Profile Information</h2>
+          <p class="text-xs text-slate-500">Details entered here are mapped dynamically into the final report.</p>
+        </div>
+
+        <form id="student-form" onsubmit="handleProfileSave(event)" class="space-y-4 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Student's Name *</label>
+              <input type="text" id="student-name" required value="" placeholder="Enter student's full name" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Date of Birth *</label>
+              <input type="date" id="dob" required value="" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Class / Grade *</label>
+              <input type="text" id="class-grade" required value="" placeholder="e.g. 10" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Date of Evaluation *</label>
+              <input type="date" id="evaluation-date" required value="" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">School Name *</label>
+              <input type="text" id="school-name" required value="" placeholder="Enter school name" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Student / Primary Contact Number *</label>
+              <input type="tel" id="contact-no" required value="" placeholder="Enter contact number" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Father's Name *</label>
+              <input type="text" id="father-name" required value="" placeholder="Enter parent/guardian name" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Father's Contact Number *</label>
+              <input type="tel" id="father-contact-no" required value="" placeholder="Enter father's contact number" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex justify-end">
+            <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2">
+              <span>Save &amp; Start MI Assessment</span>
+              <i class="fa-solid fa-arrow-right text-xs"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: MI ASSESSMENT (SECTIONS A TO H) -->
+    <section id="tab-panel-mi" class="hidden tab-content-enter">
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm mb-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Assessment 1 of 3</span>
+            <h2 id="mi-section-heading" class="text-xl font-bold font-display text-slate-900">Section A</h2>
+          </div>
+          <span class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-xl text-slate-700 border border-slate-200">
+            Answered: <strong id="mi-section-answered" class="text-blue-600">0</strong> / 8
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-3 mt-3 border-t border-slate-100" id="mi-section-tabs"></div>
+      </div>
+
+      <!-- Rating Scale Legend -->
+      <div class="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+        <span class="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex-shrink-0">
+          <i class="fa-solid fa-circle-info mr-1"></i> What does 1–4 mean?
+        </span>
+        <div class="flex flex-wrap gap-2 text-[11px] font-semibold">
+          <span class="px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-slate-700"><strong class="text-blue-700">1</strong> — Rarely / Not like me</span>
+          <span class="px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-slate-700"><strong class="text-blue-700">2</strong> — Sometimes / A little like me</span>
+          <span class="px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-slate-700"><strong class="text-blue-700">3</strong> — Often / Mostly like me</span>
+          <span class="px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-slate-700"><strong class="text-blue-700">4</strong> — Very often / Strongly like me</span>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <p class="text-[11px] text-slate-500 mb-4 flex items-start gap-1.5">
+          <i class="fa-solid fa-lightbulb text-amber-500 mt-0.5"></i>
+          For each statement below, choose the number that best reflects how true it feels for you generally — there's no right or wrong answer, so go with your first instinct.
+        </p>
+        <div id="mi-questions-container" class="space-y-3"></div>
+
+        <div class="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+          <button id="mi-prev-btn" onclick="prevMISection()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white">Previous</button>
+          <button id="mi-next-btn" onclick="nextMISection()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold">Next Section</button>
+          <button id="mi-finish-btn" onclick="switchMainTab('vak')" class="hidden px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">Proceed to VAK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: VAK SENSORY ASSESSMENT (ALL 47 Qs) -->
+    <section id="tab-panel-vak" class="hidden tab-content-enter">
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Assessment 2 of 3</span>
+          <h2 class="text-xl font-bold font-display text-slate-900">Learning Style Profile (47 Items)</h2>
+          <p class="text-[10px] text-slate-500">Select option A, B, or C for each scenario. Chosen answers turn green. Pick whichever feels most natural — there is no right or wrong choice.</p>
+        </div>
+        <div class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700">
+          Answered: <strong id="vak-answered-count" class="text-blue-600">0</strong> / 47
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div id="vak-questions-container" class="space-y-4 max-h-[600px] overflow-y-auto pr-2 pb-4"></div>
+        <div class="pt-6 mt-6 border-t border-slate-100 flex justify-between">
+          <button onclick="switchMainTab('mi')" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+            Back to MI
+          </button>
+          <button onclick="switchMainTab('brain')" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold">
+            Proceed to Brain Dominance
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: BRAIN DOMINANCE ASSESSMENT (21 PAIRS) -->
+    <section id="tab-panel-brain" class="hidden tab-content-enter">
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold text-sky-600 uppercase tracking-wider">Assessment 3 of 3</span>
+          <h2 class="text-xl font-bold font-display text-slate-900">Left vs Right Brain Dominance (21 Pairs)</h2>
+          <p class="text-[10px] text-slate-500">Select statement A or B. Chosen options turn bright green. Choose the one that sounds more like you, even if neither fits perfectly.</p>
+        </div>
+        <div class="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-xl text-slate-800 border border-slate-200">
+          Answered: <strong class="text-blue-600" id="brain-answered-count">0</strong> / 21
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div id="brain-pairs-container" class="space-y-4 max-h-[600px] overflow-y-auto pr-2 pb-4"></div>
+        <div class="pt-6 mt-6 border-t border-slate-100 flex justify-between">
+          <button onclick="switchMainTab('vak')" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+            Back to VAK
+          </button>
+          <button onclick="switchMainTab('report')" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md flex items-center gap-2">
+            <i class="fa-solid fa-cogs"></i>
+            <span>Compile Full Dossier</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: 20-PAGE COMPREHENSIVE REPORT DOSSIER -->
+    <section id="tab-panel-report" class="hidden tab-content-enter space-y-6">
+      <div id="walk-banner" class="no-print">
+        <div id="walk-banner-icon"></div>
+        <div class="flex-grow"><h3 id="walk-banner-title"></h3><p id="walk-banner-text"></p></div>
+        <button id="walk-banner-btn"></button>
+      </div>
+      
+      <!-- Top Action Toolbar -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm flex items-center justify-between no-print">
+        <div class="flex items-center gap-2">
+          <button onclick="switchMainTab('overview')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-pen-to-square"></i> Edit Data
+          </button>
+          <span class="text-xs font-bold text-slate-500 ml-2">Complete Psychometric Report (24 Pages)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="downloadFullPDFReport()" data-pdf-btn class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-lock pdf-lock"></i><i class="fa-solid fa-file-pdf"></i> Download PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Full Dossier Target Container -->
+      <div id="dossier-print-container" class="space-y-6">
+        
+        <!-- REPORT PAGE 1: COVER PAGE -->
+        <div class="report-page cover-gradient-bg text-white rounded-2xl overflow-hidden shadow-lg border border-slate-800" id="report-page-1">
+          <div class="neural-grid-overlay"></div>
+          
+          <div class="relative z-10 text-center pt-32">
+            <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight font-display mb-3">
+              Brain and Mind<br>Academy
+            </h1>
+            <p class="text-base sm:text-lg font-medium text-sky-300">
+              Comprehensive Psychometric &amp; Cognitive Profile
+            </p>
+          </div>
+
+          <div class="relative z-10 w-full max-w-md mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-7 text-center shadow-2xl mt-10">
+            <h3 class="text-lg font-bold text-white mb-2">
+              Student: <span id="cov-student-name">—</span>
+            </h3>
+            <p class="text-sm font-semibold text-slate-200 mb-1.5">
+              Class: <span id="cov-class">—</span>
+            </p>
+            <p class="text-sm font-semibold text-slate-200 mb-1.5">
+              Date of Birth: <span id="cov-dob">—</span>
+            </p>
+            <p class="text-xs font-medium text-slate-300">
+              Date of Evaluation: <span id="cov-date">—</span>
+            </p>
+          </div>
+
+          <div class="relative z-10 w-full max-w-lg mx-auto mt-8 text-center">
+            <div class="flex items-center justify-center gap-2 mb-4">
+              <span class="w-8 h-px bg-amber-300/50"></span>
+              <i class="fa-solid fa-quote-left text-amber-300/80 text-xs"></i>
+              <span class="w-8 h-px bg-amber-300/50"></span>
+            </div>
+            <p class="text-sm sm:text-base font-medium italic text-slate-100 leading-relaxed px-6 mb-1.5">
+              "It's not how smart you are, but how you are smart."
+            </p>
+            <p class="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-5">— Dr. Howard Gardner, creator of the Multiple Intelligences theory</p>
+
+            <p class="text-[11px] text-slate-300 leading-relaxed px-4">
+              This report combines Howard Gardner's Multiple Intelligence framework, VAK sensory-learning theory, and left/right brain dominance analysis into one cognitive profile.
+              <strong class="text-amber-300">It is a diagnostic self-assessment, not a test</strong> — there are no pass/fail scores, only insight into how the student naturally thinks and learns.
+            </p>
+          </div>
+
+          <div class="relative z-10 text-center pb-10 mt-auto">
+            <p class="text-xs font-bold tracking-widest text-slate-300 uppercase">
+              DISCOVER YOUR TRUE POTENTIAL
+            </p>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 2: ABOUT BRAIN & MIND ACADEMY -->
+        <div class="report-page border border-slate-200 rounded-2xl shadow-sm" id="report-page-2">
+          <div>
+            <div class="flex items-center justify-between border-b pb-4 border-slate-200 mb-6">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center text-xs font-black">BM</span>
+                <div>
+                  <h2 class="text-sm font-black font-display text-slate-900 uppercase">Brain &amp; Mind</h2>
+                  <p class="text-[10px] font-bold text-slate-500">B&amp;M — The Experts</p>
+                </div>
+              </div>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">About The Academy</span>
+            </div>
+
+            <h1 class="text-xl font-black font-display text-slate-900 mb-1.5">About Brain &amp; Mind Academy</h1>
+            <p class="text-[11px] text-slate-600 leading-snug mb-3 max-w-3xl">
+              Brain &amp; Mind Academy helps students and families understand how a child thinks, learns and grows — so academic choices, study habits and career direction are built on genuine self-awareness. We combine established psychometric frameworks with practical, one-on-one counselling to turn assessment data into a clear, actionable plan.
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px]">
+              <div>
+                <span class="block font-bold text-slate-400 uppercase tracking-wider text-[8.5px]">School</span>
+                <span id="cov-school" class="font-semibold text-slate-800">—</span>
+              </div>
+              <div>
+                <span class="block font-bold text-slate-400 uppercase tracking-wider text-[8.5px]">Student Contact</span>
+                <span id="cov-contact" class="font-semibold text-slate-800">—</span>
+              </div>
+              <div>
+                <span class="block font-bold text-slate-400 uppercase tracking-wider text-[8.5px]">Father's Name</span>
+                <span id="cov-father-name" class="font-semibold text-slate-800">—</span>
+              </div>
+              <div>
+                <span class="block font-bold text-slate-400 uppercase tracking-wider text-[8.5px]">Father's Contact</span>
+                <span id="cov-father-contact" class="font-semibold text-slate-800">—</span>
+              </div>
+            </div>
+
+            <h3 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-2">What We Offer</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-4">
+              <div class="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-clipboard-list"></i></div>
+                <h4 class="text-[10.5px] font-bold text-blue-950 mb-0.5 leading-tight">Psychometric Assessments</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">MI, VAK and brain-dominance evaluations, explained in plain language, not raw numbers.</p>
+              </div>
+              <div class="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-user-tie"></i></div>
+                <h4 class="text-[10.5px] font-bold text-emerald-950 mb-0.5 leading-tight">1-on-1 Career Counselling</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">Personal sessions to walk through results and map subject or stream choices.</p>
+              </div>
+              <div class="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-amber-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-chalkboard-user"></i></div>
+                <h4 class="text-[10.5px] font-bold text-amber-950 mb-0.5 leading-tight">Learning Workshops</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">Note-taking, time management and exam prep, tailored to each learning style.</p>
+              </div>
+              <div class="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-purple-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-people-roof"></i></div>
+                <h4 class="text-[10.5px] font-bold text-purple-950 mb-0.5 leading-tight">Parent &amp; School Engagement</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">Guided discussions with parents and school counsellors when requested.</p>
+              </div>
+              <div class="p-2.5 bg-sky-50/70 border border-sky-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-route"></i></div>
+                <h4 class="text-[10.5px] font-bold text-sky-950 mb-0.5 leading-tight">Career Pathway Guidance</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">Stream and subject direction for Classes 9–12 plus higher-education pathways.</p>
+              </div>
+              <div class="p-2.5 bg-rose-50/70 border border-rose-200 rounded-xl">
+                <div class="w-6 h-6 rounded-md bg-rose-600 text-white flex items-center justify-center mb-1 text-[10px]"><i class="fa-solid fa-arrows-rotate"></i></div>
+                <h4 class="text-[10.5px] font-bold text-rose-950 mb-0.5 leading-tight">Follow-Up &amp; Re-Assessment</h4>
+                <p class="text-[9.5px] text-slate-600 leading-snug">Periodic check-ins and re-assessment every 1–2 years to track growth.</p>
+              </div>
+            </div>
+
+            <h3 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-2">Our Approach</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[9.5px] text-slate-700">
+              <div class="flex items-start gap-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <i class="fa-solid fa-book-open-reader text-slate-500 mt-0.5"></i>
+                <span><strong>Evidence-based</strong> — Gardner's MI, VAK theory and brain-dominance research, not generic quizzes.</span>
+              </div>
+              <div class="flex items-start gap-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <i class="fa-solid fa-user-check text-slate-500 mt-0.5"></i>
+                <span><strong>Judgment-free</strong> — every profile is a diagnostic snapshot, never a label or pass/fail score.</span>
+              </div>
+              <div class="flex items-start gap-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <i class="fa-solid fa-handshake text-slate-500 mt-0.5"></i>
+                <span><strong>Partnership with families</strong> — results are explained together with parents, not just handed over.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 2 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 3: EXECUTIVE SUMMARY DASHBOARD -->
+        <div class="report-page border border-slate-200 rounded-2xl shadow-sm" id="report-page-3">
+          <div>
+            <div class="border-b pb-3 border-slate-200 mb-4">
+              <h2 class="text-xl font-bold font-display text-blue-900">Executive Summary Dashboard</h2>
+              <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                This report synthesizes data from the Multiple Intelligence Indicator, VAK Learning Style Assessment, and Brain Dominance Profile to provide a holistic view of the student's cognitive architecture.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 items-start">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">1. Multiple Intelligence Mapping</h3>
+                <p class="text-[10px] text-slate-400 mb-2">Based on the 8 intelligence domains</p>
+                <div class="h-64 flex items-center justify-center">
+                  <canvas id="miRadarCanvas"></canvas>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">2. Learning Style (VAK)</h3>
+                <p class="text-[10px] text-slate-400 mb-2">Sensory processing preferences</p>
+                <div class="h-64 flex items-center justify-center">
+                  <canvas id="vakDonutCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-100">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900">3. Brain Dominance Scale</h3>
+                  <p class="text-[10px] text-slate-400">Cerebral hemispheric distribution: Left vs Right</p>
+                </div>
+                <span class="text-xs font-bold px-3 py-1 bg-purple-50 text-purple-900 rounded-lg border border-purple-200">
+                  Status: <strong id="brain-tagline">Strong Left Brain</strong>
+                </span>
+              </div>
+              
+              <div class="grid grid-cols-12 gap-4 items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="col-span-5 h-44 flex items-center justify-center">
+                  <canvas id="brainPieCanvas"></canvas>
+                </div>
+                <div class="col-span-7 space-y-2 text-xs">
+                  <div class="p-2.5 bg-white rounded-lg border border-slate-200">
+                    <strong class="text-blue-900 block font-bold">Left Brain (<span id="cov-left-pct">0.0%</span>):</strong>
+                    <span class="text-[11px] text-slate-600">Convergent thinking, structured logic, fine analytical details.</span>
+                  </div>
+                  <div class="p-2.5 bg-white rounded-lg border border-slate-200">
+                    <strong class="text-purple-900 block font-bold">Right Brain (<span id="cov-right-pct">0.0%</span>):</strong>
+                    <span class="text-[11px] text-slate-600">Divergent thinking, expansive creativity, holistic big-picture ideation.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 3 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 4: TOP 3 MULTIPLE INTELLIGENCES (IN %) -->
+        <div class="report-page border border-slate-200 rounded-2xl shadow-sm" id="report-page-4">
+          <div>
+            <div class="border-b pb-3 border-slate-200 mb-4">
+              <h2 class="text-xl font-bold font-display text-blue-900">Multiple Intelligence Breakdown</h2>
+              <p class="text-xs text-slate-600 mt-1">
+                Dr. Howard Gardner's theory suggests we process information through 8 distinct modalities. Here are your dominant traits (Scores represented in percentage of maximum potential):
+              </p>
+            </div>
+
+            <div id="top-3-mi-container" class="space-y-4 mt-6"></div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 4 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 5: STRATEGIC SWOT ANALYSIS -->
+        <div class="report-page border border-slate-200 rounded-2xl shadow-sm" id="report-page-5">
+          <div>
+            <div class="border-b pb-3 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Strategic SWOT Analysis</h2>
+              <p class="text-xs text-slate-600 mt-1">
+                Cross-referencing your intelligences, learning styles, and brain dominance yields the following strategic overview:
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 h-[760px]">
+              <div class="p-6 rounded-2xl bg-[#2F855A] text-white shadow-sm flex flex-col justify-start">
+                <h3 class="text-lg font-black tracking-wider uppercase pb-2 border-b border-white/20 mb-4">STRENGTHS</h3>
+                <ul class="space-y-3 text-xs leading-relaxed">
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Exceptional self-reflection and emotional regulation.</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Continuous flow of innovative, out-of-the-box ideas (Right Brain).</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Strong verbal communicator and active listener.</span></li>
+                </ul>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-[#C53030] text-white shadow-sm flex flex-col justify-start">
+                <h3 class="text-lg font-black tracking-wider uppercase pb-2 border-b border-white/20 mb-4">WEAKNESSES</h3>
+                <ul class="space-y-3 text-xs leading-relaxed">
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Prone to distraction; frequently "physically present, mentally absent".</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Lower kinesthetic engagement limits hands-on mechanical stamina.</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>May struggle with rigid, strictly logical-mathematical tasks.</span></li>
+                </ul>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-[#2B6CB0] text-white shadow-sm flex flex-col justify-start">
+                <h3 class="text-lg font-black tracking-wider uppercase pb-2 border-b border-white/20 mb-4">OPPORTUNITIES</h3>
+                <ul class="space-y-3 text-xs leading-relaxed">
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Natural aptitude for leadership, counseling, and psychology.</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Can leverage audio-visual synthesis for accelerated learning.</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>High potential in creative arts, debate, and digital media design.</span></li>
+                </ul>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-[#C05621] text-white shadow-sm flex flex-col justify-start">
+                <h3 class="text-lg font-black tracking-wider uppercase pb-2 border-b border-white/20 mb-4">THREATS</h3>
+                <ul class="space-y-3 text-xs leading-relaxed">
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Strict, rote-memorization environments may stifle creative energy.</span></li>
+                  <li class="flex items-start gap-2"><span>&bull;</span><span>Lack of structured time management may hinder project completion.</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 5 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 6: TOP 5 CAREERS -->
+        <div class="report-page border border-slate-200 rounded-2xl shadow-sm" id="report-page-6">
+          <div>
+            <div class="border-b pb-3 border-slate-200 mb-4">
+              <h2 class="text-xl font-bold font-display text-blue-900">Recommended Career Pathways (Top 5)</h2>
+              <p class="text-xs text-slate-600 mt-0.5">
+                Targeted professional sectors and ideal academic subject combinations aligned with your cognitive strengths:
+              </p>
+            </div>
+
+            <div class="space-y-4 text-xs mt-6" id="career-pathways-container">
+              <!-- Populated dynamically by renderDynamicCareers() from the student's actual MI scores -->
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 6 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 7: DR. HOWARD GARDNER THEORY -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-7">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Theory of Multiple Intelligences</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">Dr. Howard Gardner &amp; His Educational Framework</h2>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-6 items-center">
+              <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 h-52 shadow-sm">
+                <div class="w-full h-full cover-gradient-bg flex flex-col items-center justify-center gap-2 text-center p-4"><div class="neural-grid-overlay"></div><i class="fa-solid fa-brain text-amber-400 text-5xl relative"></i><span class="relative text-white text-xs font-bold font-display">Theory of Multiple Intelligences</span><span class="relative text-slate-300 text-[10px] font-semibold uppercase tracking-wider">Howard Gardner, 1983</span></div>
+              </div>
+
+              <div class="sm:col-span-2 text-xs text-slate-700 space-y-3 leading-relaxed">
+                <p><strong>Dr. Howard Gardner</strong>, a renowned scientist, psychologist &amp; educationist, is the Hobbs Professor of Cognition and Education at the Harvard Graduate School of Education. He received a MacArthur Prize Fellowship in 1981 and honorary degrees from twenty-two colleges and universities.</p>
+                <p>Gardner is best known in educational circles for his <strong>"Theory of Multiple Intelligences"</strong> proposed in 1983, which has been widely accepted by science all over the world.</p>
+                <p>Today, many schools across the world are running on the educational pattern of Multiple Intelligences. He has also written extensively on creativity, leadership, and professional ethics. Here are the details of the 8 multiple intelligences proposed by him:</p>
+              </div>
+            </div>
+
+            <div class="mt-10 p-5 bg-slate-50 rounded-2xl border border-slate-200 text-center shadow-sm">
+              <h4 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-5">The Eight Interconnected Cognitive Faculties</h4>
+              <div class="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-leaf text-green-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Naturalist</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-user text-indigo-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Intrapersonal</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-book text-pink-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Linguistic</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-shapes text-amber-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Visual</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-music text-purple-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Musical</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-calculator text-teal-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Logical</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-users text-blue-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Interpersonal</span>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200 shadow-sm text-center">
+                  <i class="fa-solid fa-person-running text-orange-600 text-xl mb-2 block"></i><span class="text-[10px] font-bold">Kinesthetic</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 7 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGES 8 TO 15: 8 DEDICATED TRAIT ANALYSES -->
+        <div id="mi-elaborated-pages-container" class="space-y-6"></div>
+
+        <!-- REPORT PAGE 16: LEARNING STYLE PATTERN (VAK) DETAILED -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-16">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Learning Style Pattern</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">My Learning Style (VAK Profile)</h2>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed max-w-3xl">
+                Your learning styles have more influence than you may realize. Your preferred styles guide the way you learn. They also change the way you internally represent experiences, the way you recall information, and even the words you choose. Research shows us that each learning style uses different parts of the brain. By involving more of the brain during learning, we remember more of what we learn.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
+              <div class="p-5 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-eye"></i></span>
+                  <h4 class="font-black text-blue-900 text-base">Visual Learner</h4>
+                </div>
+                <p class="font-semibold text-blue-800 mb-3 italic">Visual learners learn best by seeing.</p>
+                <ul class="space-y-2 text-slate-700">
+                  <li>&bull; They like to read silently.</li>
+                  <li>&bull; They enjoy visual stimulation, colors, vivid imagery.</li>
+                  <li>&bull; Relate most effectively to written information.</li>
+                  <li>&bull; They can remember faces but forget names.</li>
+                </ul>
+              </div>
+
+              <div class="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-ear-listen"></i></span>
+                  <h4 class="font-black text-amber-900 text-base">Auditory Learner</h4>
+                </div>
+                <p class="font-semibold text-amber-800 mb-3 italic">Auditory learners learn best by listening.</p>
+                <ul class="space-y-2 text-slate-700">
+                  <li>&bull; They like to read out loud.</li>
+                  <li>&bull; They are good at grammar and foreign language.</li>
+                  <li>&bull; They notice sound effects in movies.</li>
+                  <li>&bull; They can't keep quiet for long periods.</li>
+                  <li>&bull; They are not afraid to speak in class.</li>
+                </ul>
+              </div>
+
+              <div class="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-hand"></i></span>
+                  <h4 class="font-black text-emerald-900 text-base">Kinesthetic Learner</h4>
+                </div>
+                <p class="font-semibold text-emerald-800 mb-3 italic">Kinesthetic learners learn best by doing.</p>
+                <ul class="space-y-2 text-slate-700">
+                  <li>&bull; They are generally good at sports/outdoor activities.</li>
+                  <li>&bull; Respond while practically doing things rather than listening/reading.</li>
+                  <li>&bull; They enjoy dancing while listening to music.</li>
+                  <li>&bull; They like adventure books or movies.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="mt-8 grid grid-cols-1 sm:grid-cols-12 gap-6 items-center bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="sm:col-span-5">
+                <h5 class="text-sm font-black uppercase tracking-wider text-slate-700 mb-3">Learning Style Index</h5>
+                <table class="w-full text-sm text-left border-collapse border border-slate-200 bg-white rounded-xl overflow-hidden shadow-sm">
+                  <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                    <th class="p-3">Learning Style</th>
+                    <th class="p-3 text-right">Score %</th>
+                  </tr>
+                  <tr class="border-b border-slate-100">
+                    <td class="p-3 font-semibold text-blue-700">VISUAL</td>
+                    <td class="p-3 text-right font-black" id="rep-page15-v">0.00%</td>
+                  </tr>
+                  <tr class="border-b border-slate-100">
+                    <td class="p-3 font-semibold text-amber-700">AUDITORY</td>
+                    <td class="p-3 text-right font-black" id="rep-page15-a">0.00%</td>
+                  </tr>
+                  <tr>
+                    <td class="p-3 font-semibold text-emerald-700">KINESTHETIC</td>
+                    <td class="p-3 text-right font-black" id="rep-page15-k">0.00%</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="sm:col-span-7 h-48 flex items-center justify-center">
+                <canvas id="page15BarCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 16 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 17: BRAIN DOMINANCE DETAILED -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-17">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Cerebral Hemispheric Balance</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">Brain Dominance Assessment</h2>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
+              <div class="p-5 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs shadow-sm">
+                <h4 class="font-black text-blue-900 text-base mb-3 flex items-center gap-2">
+                  <i class="fa-solid fa-brain text-blue-600"></i> Left Brain Dominance
+                </h4>
+                <ol class="list-decimal list-inside space-y-2 text-slate-700 leading-relaxed">
+                  <li><strong>Analytical brain:</strong> More inclined towards self-awareness, logical thinking, fine motor skills activities, language &amp; grammar and may have a hidden love towards nature.</li>
+                  <li>These people are generally good in academics.</li>
+                  <li>They have convergent thinking and can bring their energy and focus at one point.</li>
+                  <li>They prefer to respond to verbal instructions.</li>
+                  <li>They like to solve the problems by looking at the parts of things.</li>
+                  <li>They are able locate the differences in similar things easily.</li>
+                </ol>
+              </div>
+
+              <div class="p-5 rounded-2xl bg-purple-50/70 border border-purple-200 text-xs shadow-sm">
+                <h4 class="font-black text-purple-900 text-base mb-3 flex items-center gap-2">
+                  <i class="fa-solid fa-palette text-purple-600"></i> Right Brain Dominance
+                </h4>
+                <ol class="list-decimal list-inside space-y-2 text-slate-700 leading-relaxed">
+                  <li><strong>Creative brain:</strong> More inclined towards interpersonal skills, imagination, gross motor skills activities, music, colors, pictures, dance, art, rhythms, acting, painting, modelling, fashion, outdoor sports etc.</li>
+                  <li>They are generally good in extracurricular activities, primarily creative ones.</li>
+                  <li>They tend to throw the rules out of window.</li>
+                  <li>They have divergent thinking which is full of creativity and ideas.</li>
+                  <li>They are often lost in their own ideas, thoughts and world. They may be physically present, mentally absent.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="mt-8">
+              <h4 class="text-sm font-black uppercase tracking-wider text-slate-700 mb-3">Brain Dominance Classification Range</h4>
+              <div class="overflow-x-auto shadow-sm rounded-xl">
+                <table class="w-full text-center text-xs border border-slate-200 bg-white rounded-xl overflow-hidden">
+                  <tr class="bg-slate-100 font-bold border-b border-slate-200 text-slate-800">
+                    <th class="p-3 border-r border-slate-200">Strong Left Brain</th>
+                    <th class="p-3 border-r border-slate-200">Moderate Left Brain</th>
+                    <th class="p-3 border-r border-slate-200 bg-amber-100/60 text-amber-950 font-black">Middle Brain</th>
+                    <th class="p-3 border-r border-slate-200">Moderate Right</th>
+                    <th class="p-3">Strong Right Brain</th>
+                  </tr>
+                  <tr class="font-bold text-slate-700 bg-white">
+                    <td class="p-3 border-r border-slate-200">0% – 19%</td>
+                    <td class="p-3 border-r border-slate-200">24% – 38%</td>
+                    <td class="p-3 border-r border-slate-200 bg-amber-50 text-amber-800 font-black">43% – 62%</td>
+                    <td class="p-3 border-r border-slate-200">67% – 76%</td>
+                    <td class="p-3">81% – 100%</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+            <div class="mt-8 p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-sm">
+              <div class="text-center sm:text-left">
+                <span class="text-xs font-bold text-slate-400 block uppercase tracking-wider">Candidate Right-Brain Tendency</span>
+                <div class="text-3xl font-black text-slate-900 mt-1">
+                  YOUR SCORE: <span id="rep-page16-score" class="text-amber-600">0.0%</span>
+                </div>
+                <span id="rep-page16-classification" class="inline-block mt-2 px-4 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+                  Strong Left Brain (0% – 19%)
+                </span>
+              </div>
+
+              <div class="w-full sm:w-64 h-24 flex items-center justify-center">
+                <canvas id="page16BarCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 17 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 18: MASTER SCORECARD & TRI-FACTOR SYNTHESIS -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-18">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Diagnostic Synthesis</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">Master Diagnostic Scorecard &amp; Tri-Factor Correlation</h2>
+              <p class="text-xs text-slate-500 mt-1">Comprehensive tri-factor analysis synthesizing Multiple Intelligences, sensory perception, and hemispheric balance</p>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+              <div class="md:col-span-5 bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs shadow-sm">
+                <h4 class="font-black uppercase tracking-wider text-slate-800 mb-3">Master Diagnostic Scorecard</h4>
+
+                <table class="w-full text-xs text-left border-collapse border border-slate-200 bg-white rounded-xl mb-3 shadow-sm">
+                  <thead>
+                    <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                      <th class="p-2 pl-3">Multiple Intelligence</th>
+                      <th class="p-2 pr-3 text-right">Raw Score</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-page17-mi-table" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
+                </table>
+
+                <table class="w-full text-xs text-left border-collapse border border-slate-200 bg-white rounded-xl mb-3 shadow-sm">
+                  <thead>
+                    <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                      <th class="p-2 pl-3">Learning Style</th>
+                      <th class="p-2 pr-3 text-right">%</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                    <tr><td class="p-2 pl-3 font-semibold text-blue-700">VISUAL</td><td class="p-2 pr-3 text-right font-bold" id="rep-page17-v">0.00</td></tr>
+                    <tr><td class="p-2 pl-3 font-semibold text-amber-700">AUDITORY</td><td class="p-2 pr-3 text-right font-bold" id="rep-page17-a">0.00</td></tr>
+                    <tr><td class="p-2 pl-3 font-semibold text-emerald-700">KINESTHETIC</td><td class="p-2 pr-3 text-right font-bold" id="rep-page17-k">0.00</td></tr>
+                  </tbody>
+                </table>
+
+                <table class="w-full text-xs text-left border-collapse border border-slate-200 bg-white rounded-xl shadow-sm">
+                  <tr class="bg-slate-100 font-bold">
+                    <td class="p-2 pl-3">Brain Dominance (Right-Brain %)</td>
+                    <td class="p-2 pr-3 text-right font-black text-amber-600" id="rep-page17-brain">0.0%</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="md:col-span-7 space-y-4">
+                <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-slate-800 leading-relaxed shadow-sm">
+                  <h4 class="font-black text-amber-900 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-project-diagram text-amber-600"></i> The Tri-Factor Cognitive Nexus
+                  </h4>
+                  <p id="rep-page17-counselor-narrative" class="text-xs leading-relaxed text-slate-700">
+                    The psychometric profile of the candidate demonstrates their autonomous cognitive architecture across Multiple Intelligences, sensory perception modalities, and hemispheric brain equilibrium. Detailed individual traits are synthesized above once tests are completed.
+                  </p>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-3 shadow-sm">
+                  <h4 class="font-black text-slate-900 text-xs uppercase tracking-wider">
+                    Core Psychometric Dimensions:
+                  </h4>
+                  <ul class="space-y-2 text-xs text-slate-600">
+                    <li><i class="fa-solid fa-check text-emerald-600 mr-1.5"></i> <strong>Auditory-Musical Resonance:</strong> Measures responsiveness to acoustic encoding, spoken lectures, rhythm, and auditory focus.</li>
+                    <li><i class="fa-solid fa-check text-emerald-600 mr-1.5"></i> <strong>Autonomous Reflection:</strong> Evaluates self-awareness, introspective discipline, and preference for independent study pacing.</li>
+                    <li><i class="fa-solid fa-check text-emerald-600 mr-1.5"></i> <strong>Hemispheric Equilibrium:</strong> Balances sequential logic and detail-oriented focus with big-picture creativity and holistic intuition.</li>
+                  </ul>
+                </div>
+
+                <div class="rounded-2xl overflow-hidden border border-slate-200 h-32 relative bg-slate-900 shadow-sm">
+                  <div class="w-full h-full cover-gradient-bg"><div class="neural-grid-overlay"></div></div>
+                  <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-3">
+                    <p class="text-white text-xs font-bold">
+                      "At Brain and Mind, it's about empowerment. Helping students become the best version of themselves."
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 18 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 19: CLASS 9 & 10 ACADEMIC MATRIX -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-19">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Class 9 &amp; 10 Academic Matrix</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">Preferred Subjects &amp; Skill Electives</h2>
+              <p class="text-xs text-slate-500 mt-1">Tailored subject selection framework aligned with psychometric intelligences and cognitive strengths</p>
+            </div>
+
+            <div class="mt-6 space-y-4 text-xs">
+              <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-sm">
+                <h4 class="font-black text-amber-950 text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-graduation-cap text-amber-600"></i> Core Subject Allocation Strategy
+                </h4>
+                <p class="text-xs text-slate-700 leading-relaxed">
+                  Choosing the appropriate academic depth in Secondary School (CBSE/ICSE) builds strong foundational momentum while reducing academic friction:
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="stream-910-container">
+                <!-- Populated dynamically by renderDynamicStreams910() from the student's actual MI scores -->
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 19 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 20: CLASS 11, 12 & HIGHER EDUCATION -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-20">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Class 11, 12 &amp; Higher Education</h2>
+            </div>
+
+            <div class="mt-5">
+              <h2 class="text-2xl font-black font-display text-slate-900">Degree Courses &amp; High-Growth Careers</h2>
+              <p class="text-xs text-slate-500 mt-1">Undergraduate graduation programs and professional career trajectories mapped comprehensively</p>
+            </div>
+
+            <div class="mt-6 space-y-4 text-xs" id="stream-1112-container">
+              <!-- Populated dynamically by renderDynamicStreams1112() from the student's actual MI scores -->
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 20 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 21: COMPREHENSIVE FINAL SUMMARY & DERIVED INSIGHTS -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-21">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-5">
+              <h2 class="text-xl font-bold font-display text-blue-900">Comprehensive Final Summary</h2>
+              <p class="text-xs text-slate-500 mt-1">A single consolidated view of every finding in this dossier, plus insights derived by cross-referencing all three assessments</p>
+            </div>
+
+            <!-- Cognitive Archetype Banner -->
+            <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-sm mb-5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-amber-300">Cognitive Profile Archetype</span>
+              <h3 id="fs-archetype-title" class="text-lg font-black font-display mt-1 mb-1.5">—</h3>
+              <p id="fs-archetype-desc" class="text-[11px] text-slate-300 leading-relaxed">Complete all three assessments to generate a personalized cognitive archetype.</p>
+            </div>
+
+            <!-- Consolidated Scorecard -->
+            <table class="w-full text-xs text-left border-collapse border border-slate-200 bg-white rounded-xl overflow-hidden shadow-sm mb-5">
+              <thead>
+                <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                  <th class="p-2.5 pl-3">Dimension</th>
+                  <th class="p-2.5">Result</th>
+                  <th class="p-2.5 pr-3 text-right">Strength</th>
+                </tr>
+              </thead>
+              <tbody id="fs-consolidated-table" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
+            </table>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- MI Balance Index -->
+              <div class="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 shadow-sm">
+                <h4 class="text-xs font-black uppercase tracking-wider text-indigo-900 mb-2 flex items-center gap-1.5">
+                  <i class="fa-solid fa-chart-simple text-indigo-600"></i> Intelligence Balance Index
+                </h4>
+                <p id="fs-balance-label" class="text-sm font-black text-indigo-900 mb-1">—</p>
+                <p id="fs-balance-desc" class="text-[11px] text-slate-600 leading-relaxed">Derived from the spread between the highest and lowest of the 8 intelligence scores.</p>
+              </div>
+
+              <!-- Secondary Strengths -->
+              <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 shadow-sm">
+                <h4 class="text-xs font-black uppercase tracking-wider text-amber-900 mb-2 flex items-center gap-1.5">
+                  <i class="fa-solid fa-layer-group text-amber-600"></i> Supporting Intelligences (Ranks 4–6)
+                </h4>
+                <ul id="fs-secondary-list" class="text-[11px] text-slate-700 space-y-1"></ul>
+              </div>
+            </div>
+
+            <!-- Personalized Learning Strategy (derived from VAK x Brain Dominance) -->
+            <div class="mt-4 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 shadow-sm">
+              <h4 class="text-xs font-black uppercase tracking-wider text-emerald-900 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-route text-emerald-600"></i> Personalized Learning Strategy
+              </h4>
+              <p class="text-[10px] text-slate-500 mb-2 italic">Derived by combining the dominant VAK style with the brain-dominance orientation:</p>
+              <ul id="fs-strategy-list" class="text-[11px] text-slate-700 space-y-1.5"></ul>
+            </div>
+
+            <!-- Final Recommendation Narrative -->
+            <div class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+              <h4 class="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-flag-checkered text-slate-600"></i> Overall Recommendation
+              </h4>
+              <p id="fs-final-narrative" class="text-[11px] text-slate-700 leading-relaxed">Complete all three assessments (MI, VAK, Brain Dominance) to generate the final consolidated recommendation.</p>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 21 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 22: COUNSELLOR REMARKS (I) -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-22">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-6">
+              <h2 class="text-xl font-bold font-display text-blue-900">Counsellor's Observations &amp; Remarks</h2>
+              <p class="text-xs text-slate-500 mt-1">For use by the school counsellor / psychologist reviewing this dossier with the student and parents</p>
+            </div>
+
+            <div class="space-y-6 text-xs">
+              <div>
+                <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Overall Impression</h4>
+                <div class="space-y-5">
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Key Strengths Noted During Discussion</h4>
+                <div class="space-y-5">
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Areas for Development / Support Needed</h4>
+                <div class="space-y-5">
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Recommended Subject / Stream Guidance</h4>
+                <div class="space-y-5">
+                  <div class="border-b border-slate-300 h-6"></div>
+                  <div class="border-b border-slate-300 h-6"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 22 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 23: COUNSELLOR REMARKS (II) — ACTION PLAN -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-23">
+          <div>
+            <div class="border-b pb-4 border-slate-200 mb-6">
+              <h2 class="text-xl font-bold font-display text-blue-900">Action Plan &amp; Follow-Up</h2>
+              <p class="text-xs text-slate-500 mt-1">Agreed next steps and review schedule</p>
+            </div>
+
+            <table class="w-full text-xs text-left border-collapse border border-slate-200 mb-6">
+              <thead>
+                <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                  <th class="p-2.5 pl-3 border-r border-slate-200">Goal / Action Item</th>
+                  <th class="p-2.5 border-r border-slate-200 w-28">Target Date</th>
+                  <th class="p-2.5 w-28">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-slate-200"><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3">&nbsp;</td></tr>
+                <tr class="border-b border-slate-200"><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3">&nbsp;</td></tr>
+                <tr class="border-b border-slate-200"><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3">&nbsp;</td></tr>
+                <tr class="border-b border-slate-200"><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3">&nbsp;</td></tr>
+                <tr class="border-b border-slate-200"><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3 border-r border-slate-200">&nbsp;</td><td class="p-3">&nbsp;</td></tr>
+              </tbody>
+            </table>
+
+            <div class="mb-6">
+              <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Additional Notes</h4>
+              <div class="space-y-5">
+                <div class="border-b border-slate-300 h-6"></div>
+                <div class="border-b border-slate-300 h-6"></div>
+                <div class="border-b border-slate-300 h-6"></div>
+                <div class="border-b border-slate-300 h-6"></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-8 text-xs mt-8">
+              <div>
+                <div class="border-b border-slate-400 h-10 mb-1.5"></div>
+                <p class="text-slate-500 font-semibold">Counsellor Signature &amp; Date</p>
+              </div>
+              <div>
+                <div class="border-b border-slate-400 h-10 mb-1.5"></div>
+                <p class="text-slate-500 font-semibold">Parent / Guardian Signature &amp; Date</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-xs text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page 23 of 24</span>
+          </div>
+        </div>
+
+        <!-- REPORT PAGE 24: VALEDICTORY & CONTACT -->
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-24">
+          <div>
+            <div class="flex items-center justify-between border-b pb-4 border-slate-200 mb-5">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center text-xs font-black">BM</span>
+                <div>
+                  <h2 class="text-sm font-black font-display text-slate-900 uppercase">Brain &amp; Mind</h2>
+                  <p class="text-[10px] font-bold text-slate-500">B&amp;M — The Experts</p>
+                </div>
+              </div>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Institutional Valedictory</span>
+            </div>
+
+            <div class="text-center py-1">
+              <div class="w-14 h-14 mx-auto bg-slate-900 rounded-2xl p-2 flex items-center justify-center shadow-xl mb-3">
+                <svg viewBox="0 0 100 100" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M28 26 C36 17, 64 17, 72 26" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+                  <path d="M34 32 C41 24, 59 24, 66 32" stroke="#FBBF24" stroke-width="5" stroke-linecap="round"/>
+                  <path d="M41 38 C46 32, 54 32, 59 38" stroke="#F59E0B" stroke-width="4.5" stroke-linecap="round"/>
+                  <path d="M50 48 L22 42 V70 L50 78 Z" fill="#334155" stroke="#94A3B8" stroke-width="2"/>
+                  <path d="M50 48 L78 42 V70 L50 78 Z" fill="#475569" stroke="#94A3B8" stroke-width="2"/>
+                  <path d="M50 48 V78" stroke="#F59E0B" stroke-width="3"/>
+                </svg>
+              </div>
+
+              <h1 class="text-3xl font-black font-display text-slate-900 tracking-tight mb-2">THANK YOU</h1>
+              <p class="text-slate-500 text-[11px] max-w-lg mx-auto font-medium leading-snug">
+                Thank you for participating in the Brain &amp; Mind Academy Comprehensive Psychometric &amp; Learning Analytics Evaluation. We hope this complete dossier serves as a guiding light for your future endeavors.
+              </p>
+
+              <div class="mt-4 max-w-md mx-auto bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left shadow-sm">
+                <div class="space-y-2 text-xs text-slate-700">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-sm"><i class="fa-solid fa-user-tie"></i></span>
+                    <div>
+                      <strong class="text-slate-900 block font-bold text-xs">Anurag Agarwal</strong>
+                      <span class="text-slate-600 text-[11px]">Phone: 9838793949</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2.5 pt-2 border-t border-slate-200">
+                    <span class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm"><i class="fa-solid fa-envelope"></i></span>
+                    <div>
+                      <strong class="text-slate-900 block font-bold text-xs">E-mail:</strong>
+                      <span class="text-slate-600 text-[11px]">brainmindspn@gmail.com</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p class="mt-4 text-sm font-bold text-slate-700 italic">“We will take you where you can”</p>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <span class="font-bold text-slate-700">Brain &amp; Mind Academy &bull; B&amp;M — The Experts</span>
+            <span class="text-slate-400 text-[11px] italic">“We will take you where you can”</span>
+            <span class="text-[10px] font-bold text-slate-400">Page 24 of 24</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT CONTROLLER & CHART LOGIC                      -->
+  <!-- ======================================================== -->
+  <script>
+    // Audio Feedback using Web Audio API (Synthesized tone, works 100% offline)
+    let audioCtx = null;
+    function playSelectionSound() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08); // A5
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch (e) {
+        console.warn('Audio feedback warning:', e);
+      }
+    }
+
+    // 8 Multiple Intelligence Dimensions
+    const MI_DATA = [
+      {
+        id: 'A', name: 'Intrapersonal Intelligence', short: 'Intrapersonal', tagline: 'Self Smart',
+        image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80',
+        description: 'Highly self-aware with a deep understanding of personal feelings, temperaments, and motivations. You excel in self-paced environments and possess a philosophical approach to problem-solving.',
+        actionableTip: 'Establish a quiet place for daily introspection and goal setting.',
+        characteristics: [
+          "High introspective awareness and deep understanding of emotional triggers.",
+          "Strong preference for self-paced, autonomous working and studying environments.",
+          "Internally motivated with defined personal values, ethics, and independent thinking.",
+          "Continuous self-evaluation and philosophical approach to problems."
+        ],
+        valuePoints: [
+          "Exceptional resilience and emotional self-regulation during challenging phases.",
+          "Clear goal orientation and autonomous focus without needing constant external supervision.",
+          "Deep critical evaluation of ideas, preventing impulsive or crowd-driven mistakes."
+        ],
+        remedies: [
+          "Learn to meditate or set aside quiet daily contemplation periods.",
+          "Keep a reflective learning journal to record insights and thought patterns.",
+          "Establish a designated distraction-free zone for solitary revision.",
+          "Study philosophical frameworks and ethics across diverse traditions.",
+          "Practice setting self-determined milestones before starting major tasks."
+        ],
+        questions: [
+          "I am a private person and I like my private inner world",
+          "I have a few close friends",
+          "I have strong opinions about controversial issues",
+          "I work best when the activity is self-paced",
+          "I am not easily influenced by other people",
+          "I have a good understanding of my feelings and how I will react to situations",
+          "I often raise questions concerning values and beliefs",
+          "I understand that I am responsible for my own behaviour"
+        ]
+      },
+      {
+        id: 'B', name: 'Interpersonal Intelligence', short: 'Interpersonal', tagline: 'People Smart',
+        image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80',
+        description: "Characterized by sensitivity to others' moods and a strong ability to cooperate. You thrive in group settings and communicate effortlessly.",
+        actionableTip: 'Take on leadership roles in team projects to leverage your empathy.',
+        characteristics: [
+          "Naturally attuned to verbal and non-verbal cues, moods, and group dynamics.",
+          "Thrives in collaborative environments, team sports, and collective study forums.",
+          "Strong conflict resolution, mediator qualities, and natural leadership presence.",
+          "Learns most effectively through discussion, debate, and interactive explanation."
+        ],
+        valuePoints: [
+          "Builds strong social networks and high-trust collaborative partnerships.",
+          "Skilled at motivating teams, understanding peer perspectives, and cross-cultural empathy.",
+          "Excellent adaptability in group projects and collaborative academic presentations."
+        ],
+        remedies: [
+          "Practice active listening without interrupting during group deliberations.",
+          "Take up leadership or mediator responsibilities in school clubs or house activities.",
+          "Form structured peer-study groups where you take turns teaching concepts.",
+          "Volunteer for community service programs and social leadership camps.",
+          "Participate in debate competitions, Model UN, and interpersonal communication seminars."
+        ],
+        questions: [
+          "I work best through interaction with people",
+          "I enjoy team sports rather than individual sports",
+          "Being around people energizes me",
+          "I prefer group activities rather than ones I do alone",
+          "I enjoy learning about different cultures",
+          "I usually talk over my personal problems with a friend",
+          "I enjoy sharing my ideas and feelings with others",
+          "I work best in a co-operative group where I can discuss issue with others"
+        ]
+      },
+      {
+        id: 'C', name: 'Logical Mathematical Intelligence', short: 'Logical', tagline: 'Number Smart',
+        image: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=600&q=80',
+        description: 'Enjoys logical thinking, patterns, abstract reasoning, and systematic cause-and-effect problem solving.',
+        actionableTip: 'Solve logic puzzles and explore structured computer programming concepts.',
+        characteristics: [
+          "Enjoys identifying patterns, deductive logic, and quantitative relationships.",
+          "Methodical approach to problem-solving through structured, step-by-step algorithms.",
+          "Comfortable with abstract formulas, algorithmic reasoning, and puzzle-solving.",
+          "Naturally questions anomalies and seeks cause-and-effect clarification."
+        ],
+        valuePoints: [
+          "Strong rational decision-making rooted in empirical facts and quantitative data.",
+          "High aptitude for competitive quantitative tests, computing, and analytical research.",
+          "Systematic time management and structured organization of academic syllabi."
+        ],
+        remedies: [
+          "Solve daily logic puzzles such as Sudoku, KenKen, and tactical chess scenarios.",
+          "Break down complex syllabus topics into flowcharts, matrices, and cause-effect chains.",
+          "Learn foundational computer programming or algorithmic scripting (Python/Scratch).",
+          "Connect textbook math formulas with real-world financial or statistical scenarios.",
+          "Practice verbalizing the step-by-step logic used to solve complex numerical problems."
+        ],
+        questions: [
+          "I work best in an organized work area",
+          "I enjoyed math and /or science",
+          "I keep a 'things to do' list",
+          "I enjoyed playing brainteasers and games that involve logical thinking e.g. Sudoku",
+          "I like to ask 'why' questions and seek clarification of issues and concerns",
+          "I work best when I have a day planner or timetable",
+          "I quickly grasp cause and effect relationships",
+          "I am good at estimating"
+        ]
+      },
+      {
+        id: 'D', name: 'Visual-Spatial Intelligence', short: 'Visual', tagline: 'Art Smart',
+        image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80',
+        description: 'Excellent at visualizing and mentally manipulating objects. You have strong visual memory and an inclination toward artistic expression.',
+        actionableTip: 'Use mind maps and flowcharts to break down complex academic concepts.',
+        characteristics: [
+          "Thinks in vivid mental imagery, diagrams, colors, and 3D spatial models.",
+          "Easily reads maps, infographics, schematics, and geometric configurations.",
+          "Strong visual memory for faces, layouts, and graphical information.",
+          "Inclined toward artistic design, drawing, spatial orientation, and visual aesthetics."
+        ],
+        valuePoints: [
+          "Rapid conceptual comprehension through mind maps, infographics, and color-coding.",
+          "Aptitude for spatial engineering, architecture, design thinking, and UI/UX planning.",
+          "Retains complex information by associating chapters with distinct visual anchors."
+        ],
+        remedies: [
+          "Convert textual notes into structured visual mind maps and colorful sketches.",
+          "Use color-coded highlighters and spatial margins to organize key study points.",
+          "Practice spatial puzzle games like Rubik’s Cube, tangrams, and 3D jigsaw sets.",
+          "Create flowcharts and visual timelines when preparing for history and science tests.",
+          "Maintain a visual sketchbook to doodle concepts while listening to lectures."
+        ],
+        questions: [
+          "I understand colour combinations and what colors work well together",
+          "I enjoyed solving jigsaw, maze and/or other visual puzzles e.g. Rubik cube",
+          "I read charts and maps easily",
+          "I have a good sense of easily",
+          "I like to watch scenes and activities in movies",
+          "I have vivid dreams when sleeping",
+          "I can anticipate the moves and consequences in a game plan (e.g. hockey, chess)",
+          "I remember things best by seeing them"
+        ]
+      },
+      {
+        id: 'E', name: 'Kinesthetic Intelligence', short: 'Kinesthetic', tagline: 'Body Smart',
+        image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80',
+        description: 'Understands best by doing, tactile touch, physical interaction, and motor coordination.',
+        actionableTip: 'Incorporate tactile movement and hands-on experiments into study intervals.',
+        characteristics: [
+          "Exceptional physical balance, motor control, and tactile responsiveness.",
+          "Learns through hands-on experimentation, building physical models, and interactive trial.",
+          "May fidget or tap during prolonged sedentary study sessions.",
+          "Possesses strong muscle memory and physical-spatial intuition."
+        ],
+        valuePoints: [
+          "High agility, endurance, and tactile problem-solving under active conditions.",
+          "Excels in laboratory experiments, surgical precision, sports, and applied crafts.",
+          "Deep physical memory retention once an activity is physically practiced."
+        ],
+        remedies: [
+          "Incorporate physical movement into study sessions (walk while revising flashcards).",
+          "Build physical prototypes, clay models, or dioramas for science and geography concepts.",
+          "Schedule regular athletic intervals to channel physical energy before long study hours.",
+          "Use tactile tools (stress balls, writing by hand) to maintain focus during reading.",
+          "Learn technical crafts such as woodworking, robotics assembly, or instrumental play."
+        ],
+        questions: [
+          "I like to move, tap or fidget when sitting",
+          "I participate in extreme sport (e.g. bungee, sky diving)",
+          "I am curious as to how things feel and often touch objects to examine textures",
+          "I am well coordinated in most of my body movements",
+          "I like working with my hands",
+          "I prefer to be physically involved rather than sitting and watching",
+          "I understand best by doing (touching, moving and interacting)",
+          "I enjoy creating things with my hands"
+        ]
+      },
+      {
+        id: 'F', name: 'Linguistic Intelligence', short: 'Linguistic', tagline: 'Word Smart',
+        image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=80',
+        description: 'Enjoys words, reading, writing, debates, and expressing ideas articulately in verbal formats.',
+        actionableTip: 'Engage in elocution contests and write structured reflection journals.',
+        characteristics: [
+          "Broad vocabulary and high sensitivity to syntax, idioms, and verbal nuances.",
+          "Enjoys reading diverse literature, writing essays, storytelling, and poetic expression.",
+          "Skilled at debating, articulating viewpoints persuasively, and written exposition.",
+          "Retains verbal explanations and audio lectures with ease."
+        ],
+        valuePoints: [
+          "High performance in written examinations, subjective answer writing, and verbal reasoning.",
+          "Strong persuasive communication capability in public speaking, law, and diplomacy.",
+          "Rapid second-language acquisition and semantic comprehension."
+        ],
+        remedies: [
+          "Read a challenging non-fiction book or high-caliber editorial weekly.",
+          "Practice writing concise chapter summaries and structured 500-word arguments.",
+          "Engage in competitive debates, elocution contests, or public speaking forums.",
+          "Play wordplay games (Scrabble, crosswords, anagrams) to expand lexical range.",
+          "Record verbal answers to revision questions and critically review your playback."
+        ],
+        questions: [
+          "I like puns and other wordplay",
+          "I feel comfortable and enjoy dealing with language and words",
+          "I love completing crosswords and other word games like Scrabble",
+          "I remember things exactly as they are said to me",
+          "I like to take part in debates and/or discussions",
+          "I prefer writing long and short answers rather than multiple choice responses",
+          "I enjoyed keeping a written journal and/or writing stories and articles",
+          "I like to read a lot"
+        ]
+      },
+      {
+        id: 'G', name: 'Musical Intelligence', short: 'Musical', tagline: 'Music Smart',
+        image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
+        description: 'Acute sensitivity toward pitch, rhythm, tone, and musical cadence. Strong oral memory.',
+        actionableTip: 'Use audio mnemonics and rhythmic recitation to memorize key definitions.',
+        characteristics: [
+          "Strong acoustic sensitivity to pitch, timbre, harmonious intervals, and rhythm.",
+          "Easily memorizes facts by formulating rhymes, musical cadence, or rhythmic beats.",
+          "Often studies effectively with structured instrumental or ambient soundscapes.",
+          "Aptitude for singing, playing musical instruments, or analyzing sound design."
+        ],
+        valuePoints: [
+          "Rapid retention through oral lectures, acoustic playbacks, and rhythmic mnemonics.",
+          "Enhanced pattern recognition skills applicable across both mathematics and linguistics.",
+          "High auditory focus and ability to distinguish nuanced tone in communication."
+        ],
+        remedies: [
+          "Convert key definitions and lists of facts into rhythmic mnemonics or rhymes.",
+          "Listen to audio lectures and podcasts while reviewing revision notes.",
+          "Experiment with low-tempo instrumental music (e.g., baroque or lo-fi) during study blocks.",
+          "Learn an acoustic instrument to sharpen cognitive rhythm and temporal processing.",
+          "Read poems and key language passages aloud to absorb their natural cadence."
+        ],
+        questions: [
+          "I literally play music in my head",
+          "I make up a rhyme to remember something",
+          "It is easy for me to follow the beat of music",
+          "I like setting songs and poems to music",
+          "I keep time when music is playing",
+          "I can easily hear an off-key note",
+          "I find it easy to engage in musical activities",
+          "I feel proud of my musical accomplishments"
+        ]
+      },
+      {
+        id: 'H', name: 'Naturalist Intelligence', short: 'Naturalist', tagline: 'Nature Smart',
+        image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80',
+        description: 'Observant of living systems, outdoor environments, flora, and fauna.',
+        actionableTip: 'Utilize categorical classification trees and outdoor study routines.',
+        characteristics: [
+          "Deep connection to living ecosystems, plants, animals, and weather patterns.",
+          "Highly observant of subtle visual and environmental differences in natural specimens.",
+          "Enjoys outdoor exploration, field trips, gardening, hiking, and conservation.",
+          "Naturally categorizes information into taxonomies, systems, and living hierarchies."
+        ],
+        valuePoints: [
+          "Exceptional acumen in biological sciences, environmental ecology, geology, and agriculture.",
+          "High observational focus and patience in empirical research and field studies.",
+          "Holistic understanding of interconnected environmental and organizational systems."
+        ],
+        remedies: [
+          "Maintain a detailed botanical, environmental, or nature observation journal.",
+          "Organize conceptual study notes into hierarchical classification charts and trees.",
+          "Relocate study blocks to natural outdoor settings or well-ventilated green spaces.",
+          "Engage in real-world environmental projects, animal welfare, or gardening activities.",
+          "Use multisensory field studies and museum visits to ground theoretical science concepts."
+        ],
+        questions: [
+          "I have a collection from nature (e.g. shells, leaves, rocks, flowers)",
+          "I notice similarities and difference between trees, flowers and others in nature",
+          "I am actively involved in protecting the environment",
+          "I enjoy digging for and discovering artifacts and natural items",
+          "I prefer to be outdoors rather than indoors",
+          "I like planting and caring for a garden",
+          "I enjoy hiking, trekking and nature trails",
+          "I learn best on fields trips to explore and observe nature, museums etc."
+        ]
+      }
+    ];
+
+    // ALL 47 VAK Questions
+    const VAK_QUESTIONS = [
+      { id: 1, prompt: "When I operate new equipment I generally:", a: "Read the instruction first", b: "Listen to an explanation from someone who has used it before", c: "Go ahead and have a go; I can figure it out as I use it" },
+      { id: 2, prompt: "When I need directions for travelling I usually:", a: "Look at a map", b: "Ask for spoken directions", c: "Follow my nose and maybe use a compass" },
+      { id: 3, prompt: "When I cook a new dish, I like to:", a: "Follow a written recipe", b: "Call a friend for an explanation", c: "Follow my instincts, testing as I cook" },
+      { id: 4, prompt: "If I am teaching someone something new, I tend to:", a: "Write instructions down for them", b: "Give them a verbal explanation", c: "Demonstrate first and then let them have a go" },
+      { id: 5, prompt: "I tend to say:", a: "Watch how I do it", b: "Listen to me explain", c: "You have a go" },
+      { id: 6, prompt: "During my free time usually enjoy:", a: "Going to museums and galleries", b: "Listening to music and talking to my friends", c: "Playing sport or doing do-it-yourself (DIY)" },
+      { id: 7, prompt: "When I go shopping for clothes, I tend to:", a: "Imagine what they would look like on", b: "Discuss them with the shop staff", c: "Try them on and test them out" },
+      { id: 8, prompt: "When I am choosing a holiday I usually:", a: "Read lots of brochures", b: "Listen to recommendations from friends", c: "Imagine what it would be like to be there" },
+      { id: 9, prompt: "If I was buying a new car, I would:", a: "Read reviews in newspapers and magazines", b: "Discuss what I need with my friends", c: "Test-drive lots of different types" },
+      { id: 10, prompt: "When learning a new skill, I am most comfortable:", a: "Watching what the teacher is doing", b: "Talking through with teachers exactly what I'm supposed to do", c: "Giving it a try myself and work it out as I go" },
+      { id: 11, prompt: "If I am choosing food off a menu, I tend to:", a: "Imagine what the food will look like", b: "Talk through the options in my head or with my partner", c: "Imagine what the food will taste like" },
+      { id: 12, prompt: "When I listen to a band, I can't help:", a: "Watching the band members and other people in the audience", b: "Listening to the lyrics and the beats", c: "Moving in time with the music" },
+      { id: 13, prompt: "When I concentrate, I mean often:", a: "Focus on the words or the pictures in front of me", b: "Discuss the problem and the possible solutions in my head", c: "Move around a lot, fiddle with pens, pencils and touch things" },
+      { id: 14, prompt: "I choose household furnishings because I like:", a: "Their colors and how they look", b: "The descriptions the salespeople give me", c: "Their textures and what it feels like to touch them" },
+      { id: 15, prompt: "My first memory is of:", a: "Looking at somethings", b: "Being spoken to", c: "Doing somethings" },
+      { id: 16, prompt: "When I am anxious, I:", a: "Visualize the worst-case scenarios", b: "Talk over in my head what worries me most", c: "Can't sit still, fiddle and move around constantly" },
+      { id: 17, prompt: "I feel especially connected to other people because of:", a: "How they look", b: "What they say to me", c: "How they make me feel" },
+      { id: 18, prompt: "When I have to revise for an exam I generally:", a: "Show them what I mean", b: "Explain to them in different ways until they understand", c: "Encourage them to try and talk through my ideas as they do it" },
+      { id: 19, prompt: "I really love:", a: "Watching films, photography looking at art or people watching", b: "Listening to music, the radio or talking to friends", c: "Taking part in sports activities, fine foods, wine or dance" },
+      { id: 20, prompt: "Most of my free time is spent:", a: "Watching television", b: "Talking to friends", c: "Doing physical activity or making things" },
+      { id: 21, prompt: "When I first contact a new person, I usually:", a: "Arrange a face to face meeting", b: "Talk to them on the telephone", c: "Try to get together whilst doing an activity like eating a meal" },
+      { id: 22, prompt: "I first notice how people:", a: "Look and dress", b: "Sound and speak", c: "Stand and move" },
+      { id: 23, prompt: "If I am angry, I tend to:", a: "Keep replaying in my mind what it is that has upset me", b: "Raise my voice and tell people how I feel", c: "Stamp about, slam doors and physically demonstrate my anger" },
+      { id: 24, prompt: "I find it easiest to remember:", a: "Faces", b: "Names", c: "Things I have done" },
+      { id: 25, prompt: "I think that you can tell if someone is lying if:", a: "They avoid looking at you", b: "Their voice changes", c: "They give me funny vibes" },
+      { id: 26, prompt: "When I meet an old friend:", a: "I say it's great to see you", b: "I say it's great to hear from you", c: "I give them a hug or a handshake" },
+      { id: 27, prompt: "I remember things best by:", a: "Writing notes or keeping printed details", b: "Saying them aloud or repeating words and key points in my head", c: "Doing and practising the activities or imagining it being done" },
+      { id: 28, prompt: "To complain about faulty goods, I am comfortable:", a: "Writing a letter", b: "Complaining over the phone", c: "Taking the item back to the store or posting it to head office" },
+      { id: 29, prompt: "I tend to say:", a: "I see what you mean", b: "I hear what you are saying", c: "I know how you feel" },
+      { id: 30, prompt: "When you study for a test, would you rather:", a: "Read notes, headings in a book, look at diagrams and illustrations", b: "Have someone ask you questions, repeat facts silent to yourself", c: "Write things out on index cards and make models or diagrams" },
+      { id: 31, prompt: "Which of these do you do when you listen to music:", a: "Daydream (see things that go with the music)", b: "Hum along", c: "Move with the music, tap your feet, etc." },
+      { id: 32, prompt: "When you work at solving a problem do you:", a: "Make a list, organise steps and check them off as they are done", b: "Make a few phone calls and talk to friends or experts", c: "Make a model of the problems walk through all steps in your mind" },
+      { id: 33, prompt: "When you read for fun, do you prefer:", a: "A travel book with a lot of pictures in it", b: "A mystery book with a lot of conversation in it", c: "A book where you answer questions and solve problems" },
+      { id: 34, prompt: "To learn how a computer works, would you rather:", a: "Watch a movie about it", b: "Listen to someone explain it", c: "Take the computer apart and try to figure it out for yourself" },
+      { id: 35, prompt: "Having entered a science museum, would you first:", a: "Look around and find a map showing locations of the various exhibits", b: "Talk to a museum guide and ask about exhibits", c: "Go into the first exhibit that looks interesting, read directions later" },
+      { id: 36, prompt: "What kind of restaurant would you not go to:", a: "One with the lights too bright", b: "One with the music too loud", c: "One with uncomfortable chairs" },
+      { id: 37, prompt: "Would you rather go to:", a: "An art class", b: "A music class", c: "An exercise class" },
+      { id: 38, prompt: "If I am explaining to someone I tend to:", a: "Show them what I mean", b: "Explain to them in different ways until they understand", c: "Encourage them to try and talk through my idea as they do it" },
+      { id: 39, prompt: "I really love:", a: "Watching films, photography looking at art or people watching", b: "Listening to music, the radio or talking to friends", c: "Taking part in sports activities, fine foods and dance" },
+      { id: 40, prompt: "Which are you most likely to do when you are happy:", a: "Grin", b: "Shout with joy", c: "Jump for joy" },
+      { id: 41, prompt: "At a party, what would you be most likely to remember the next day:", a: "The faces of the people there, but not the names", b: "The names but not the faces", c: "The things you did and said while you were there" },
+      { id: 42, prompt: "When you see the word d-o-g, what do you do first:", a: "Think of a picture of a particular dog", b: "Say the word 'dog' to yourself silently", c: "Sense feeling of being with a dog (petting it, running with it etc)" },
+      { id: 43, prompt: "When you tell a story, would you rather:", a: "Write it", b: "Tell it out loud", c: "Act it out" },
+      { id: 44, prompt: "What is most distracting for you when you are trying to concentrate:", a: "Visual distractions", b: "Noises", c: "Other sensations like hunger, worry etc" },
+      { id: 45, prompt: "What are you most likely to do when you are angry:", a: "Scowl", b: "Shout or 'blow up'", c: "Stomp off and slam doors" },
+      { id: 46, prompt: "When not sure how to spell a word, what are you most likely to do:", a: "Write it out to see if it looks right", b: "Sound it out", c: "Write it out to see if it feels right" },
+      { id: 47, prompt: "When standing in a long line at movies, what are you most likely to do:", a: "Look at posters advertising other movies", b: "Talk to person next to you", c: "Tap your feet or move around in some other way" }
+    ];
+
+    // ALL 21 BRAIN DOMINANCE PAIRS
+    const BRAIN_PAIRS = [
+      { id: 1, stmtA: "It's fun to take risks", typeA: 'R', stmtB: "I have fun without taking risk", typeB: 'L' },
+      { id: 2, stmtA: "I look for new ways to do old jobs", typeA: 'R', stmtB: "When one way works well, I don't change it", typeB: 'L' },
+      { id: 3, stmtA: "I begin many jobs that I never finish", typeA: 'R', stmtB: "I finish a job before starting a new one", typeB: 'L' },
+      { id: 4, stmtA: "I'm not very imaginative in my work", typeA: 'L', stmtB: "I use my imagination in everything I do", typeB: 'R' },
+      { id: 5, stmtA: "I can analyse what is going to happen next", typeA: 'L', stmtB: "I can sense what is going to happen next", typeB: 'R' },
+      { id: 6, stmtA: "I try to find the one best way to solve a problem", typeA: 'L', stmtB: "I try to find different answers to problems", typeB: 'R' },
+      { id: 7, stmtA: "My thinking is like pictures going through my head", typeA: 'R', stmtB: "My thinking is like words going through my head", typeB: 'L' },
+      { id: 8, stmtA: "I agree with new ideas before other people do", typeA: 'R', stmtB: "I question new ideas more than other people do", typeB: 'L' },
+      { id: 9, stmtA: "Other people don't understand how I organise things", typeA: 'R', stmtB: "Other people think I organise well", typeB: 'L' },
+      { id: 10, stmtA: "I have good self-discipline", typeA: 'L', stmtB: "I usually act on my feelings", typeB: 'R' },
+      { id: 11, stmtA: "I plan time for doing my work", typeA: 'L', stmtB: "I don't think about the time when I work", typeB: 'R' },
+      { id: 12, stmtA: "With a hard decision, I choose what I know is right", typeA: 'L', stmtB: "With a hard decision, I choose what I feel is right", typeB: 'R' },
+      { id: 13, stmtA: "I do easy things first and important things later", typeA: 'R', stmtB: "I do the important things first and the easy things later", typeB: 'L' },
+      { id: 14, stmtA: "Sometimes in a new situation, I have too many ideas", typeA: 'R', stmtB: "Sometimes in a new situation, I don't have any ideas", typeB: 'L' },
+      { id: 15, stmtA: "I have to have a lot of change and verity in my life", typeA: 'R', stmtB: "I have to have an orderly and well planned life", typeB: 'L' },
+      { id: 16, stmtA: "I know I'm right, because I have good reasons", typeA: 'L', stmtB: "I know I'm right, even without good reasons", typeB: 'R' },
+      { id: 17, stmtA: "I spread my work evenly over the time I have", typeA: 'L', stmtB: "I prefer to do my work at the last minute", typeB: 'R' },
+      { id: 18, stmtA: "I keep everything in a particular place", typeA: 'L', stmtB: "Where I keep things depends on what I'm doing", typeB: 'R' },
+      { id: 19, stmtA: "I have to make my own plans", typeA: 'R', stmtB: "I can follow anyone's plans", typeB: 'L' },
+      { id: 20, stmtA: "I am a very flexible and unpredictable person", typeA: 'R', stmtB: "I am a consistent and stable person", typeB: 'L' },
+      { id: 21, stmtA: "With a new task, I want to find my own ways of doing it", typeA: 'R', stmtB: "With a new task, I want to be told the best way to it", typeB: 'L' }
+    ];
+
+    // ===================================================================
+    // DYNAMIC CAREER & SUBJECT RECOMMENDATION DATA
+    // Every career/stream below is tagged with the 1-3 MI trait ids (A-H)
+    // it draws on. At report time each entry is scored against the
+    // student's actual MI percentages and re-ranked, so the "Top 5
+    // Careers", "Class 9 & 10" and "Class 11/12" pages change with the
+    // student's real answers instead of showing the same fixed list to
+    // everyone.
+    // ===================================================================
+    const CAREER_CATALOG = [
+      {
+        name: "Product Design & UI/UX Architecture", traits: ['D', 'E'],
+        subjects: "Physics, Mathematics, Design Thinking / Computer Science / Graphic Design.",
+        courses: "B.Des (NID/UCEED), B.Arch, Interaction Design.",
+        icon: "fa-pen-ruler", color: "blue"
+      },
+      {
+        name: "Clinical Psychology & Behavioral Counseling", traits: ['A', 'B'],
+        subjects: "Psychology, Sociology, Biology / English Literature.",
+        courses: "BA/B.Sc (Hons) Psychology, Cognitive Neuroscience, Child Development.",
+        icon: "fa-brain", color: "emerald"
+      },
+      {
+        name: "Media, Mass Communication & Journalism", traits: ['F', 'B'],
+        subjects: "Mass Media Studies, Political Science, English Elective, History.",
+        courses: "BA Journalism, Mass Communication, Digital Content Direction.",
+        icon: "fa-microphone-lines", color: "purple"
+      },
+      {
+        name: "Legal Studies, Public Policy & Advocacy", traits: ['F', 'C'],
+        subjects: "Legal Studies, Political Science, Economics, Mathematics.",
+        courses: "BA LLB / BBA LLB (5-Year Integrated at NLUs).",
+        icon: "fa-scale-balanced", color: "amber"
+      },
+      {
+        name: "Creative Direction & Audio-Visual Production", traits: ['G', 'D'],
+        subjects: "Fine Arts, Hindustani/Carnatic Music, Multi-Media.",
+        courses: "Sound Engineering, BFA, Film & Television Direction.",
+        icon: "fa-clapperboard", color: "rose"
+      },
+      {
+        name: "Software & Data Engineering", traits: ['C', 'D'],
+        subjects: "Physics, Mathematics, Computer Science / Informatics Practices.",
+        courses: "B.Tech CSE/AI, B.Sc Computing, Integrated M.Sc Data Analytics.",
+        icon: "fa-laptop-code", color: "blue"
+      },
+      {
+        name: "Medicine & Life Sciences", traits: ['H', 'C'],
+        subjects: "Physics, Chemistry, Biology, Mathematics (optional).",
+        courses: "MBBS, BDS, B.Sc Biotechnology, Biomedical Sciences.",
+        icon: "fa-stethoscope", color: "emerald"
+      },
+      {
+        name: "Environmental Science & Sustainability", traits: ['H', 'E'],
+        subjects: "Biology, Geography, Environmental Science, Chemistry.",
+        courses: "B.Sc Environmental Science, Agricultural Sciences, Ecology.",
+        icon: "fa-leaf", color: "emerald"
+      },
+      {
+        name: "Sports Science & Physical Training", traits: ['E', 'A'],
+        subjects: "Physical Education, Biology, Psychology.",
+        courses: "B.Sc Sports Science, Physiotherapy, Sports Coaching & Management.",
+        icon: "fa-person-running", color: "amber"
+      },
+      {
+        name: "Entrepreneurship & Business Strategy", traits: ['B', 'C'],
+        subjects: "Business Studies, Economics, Mathematics, Accountancy.",
+        courses: "BBA/BMS (IIM IPM), B.Com (Hons), Entrepreneurship & Innovation.",
+        icon: "fa-chart-line", color: "amber"
+      },
+      {
+        name: "Teaching & Educational Leadership", traits: ['B', 'F'],
+        subjects: "Psychology, English, Education Studies, any core subject.",
+        courses: "B.El.Ed, B.A. B.Ed (Integrated), M.A. Education.",
+        icon: "fa-chalkboard-user", color: "purple"
+      },
+      {
+        name: "Music Production & Performance", traits: ['G', 'E'],
+        subjects: "Music (Hindustani/Carnatic/Western), Physics (acoustics), Fine Arts.",
+        courses: "B.Perf.Arts (Music), Sound Engineering, B.A. Music.",
+        icon: "fa-music", color: "rose"
+      },
+      {
+        name: "Architecture & Spatial Design", traits: ['D', 'C'],
+        subjects: "Mathematics, Physics, Design Thinking / Fine Arts.",
+        courses: "B.Arch (NATA/JEE), B.Des, Urban & Spatial Planning.",
+        icon: "fa-drafting-compass", color: "blue"
+      },
+      {
+        name: "Research & Academic Writing", traits: ['A', 'F'],
+        subjects: "English Literature, History, Philosophy, core science/humanities.",
+        courses: "BA/B.Sc (Research), Integrated PhD tracks, Academic Publishing.",
+        icon: "fa-feather-pointed", color: "purple"
+      }
+    ];
+
+    // Class 9 & 10 subject-elective buckets, each tagged with the traits it
+    // best suits. Same four buckets always shown (every student needs a
+    // Class 9/10 subject plan), but re-ordered and badged by fit.
+    const STREAM_910 = [
+      {
+        key: 'stem', name: "STEM & Analytical", traits: ['C', 'D', 'H'],
+        icon: 'fa-square-root-variable', color: 'teal',
+        blurb: "High Logical-Mathematical, Spatial, or Naturalist profiles.",
+        items: [
+          "<strong>Mathematics:</strong> Choose <em>Mathematics Standard (041)</em> for future science/commerce streams.",
+          "<strong>Science:</strong> Integrated Physics, Chemistry, Biology with lab emphasis.",
+          "<strong>Skill Elective:</strong> Artificial Intelligence, Information Technology (402), Coding &amp; Robotics."
+        ]
+      },
+      {
+        key: 'humanities', name: "Humanities & Linguistic", traits: ['F', 'A', 'B'],
+        icon: 'fa-book-bookmark', color: 'indigo',
+        blurb: "High Linguistic, Intrapersonal, or Interpersonal profiles.",
+        items: [
+          "<strong>Languages:</strong> Advanced English Language &amp; Literature, Foreign Language.",
+          "<strong>Social Sciences:</strong> History, Civics, Geography &amp; Economics.",
+          "<strong>Skill Elective:</strong> Mass Media, Introduction to Financial Markets, Marketing."
+        ]
+      },
+      {
+        key: 'creative', name: "Creative & Visual-Spatial", traits: ['D', 'G', 'E'],
+        icon: 'fa-palette', color: 'orange',
+        blurb: "High Visual-Spatial, Musical, or Kinesthetic profiles.",
+        items: [
+          "<strong>Core Elective:</strong> Painting, Commercial Art, Carnatic / Hindustani Music.",
+          "<strong>Applied Skills:</strong> Design Thinking &amp; Innovation, Handicrafts, Multi-Media.",
+          "<strong>Math Strategy:</strong> Consider <em>Mathematics Basic (241)</em> for Arts/Law."
+        ]
+      },
+      {
+        key: 'bioeco', name: "Bio-Eco & Physical", traits: ['H', 'E'],
+        icon: 'fa-seedling', color: 'emerald',
+        blurb: "High Naturalist, Kinesthetic, and Experiential learning.",
+        items: [
+          "<strong>Electives:</strong> Environmental Science, Agriculture, Physical Activity Trainer.",
+          "<strong>Co-Curricular:</strong> Sports academies, Scouting, NCC, Nature Conservation clubs.",
+          "<strong>Study Technique:</strong> Tactile demonstrations, field journals, projects."
+        ]
+      }
+    ];
+
+    // Class 11/12 & higher-education stream buckets, tagged the same way.
+    const STREAM_1112 = [
+      {
+        key: 'pcm', name: "Engineering, Technology & Applied Math (PCM)", traits: ['C', 'D'],
+        icon: 'fa-laptop-code', color: 'blue',
+        courses: "B.Tech/B.E. (Computer Science, AI &amp; Machine Learning, Data Science, Robotics, Aerospace), B.Sc (Hons) in Mathematics/Computing, Integrated M.Sc (Data Analytics).",
+        careers: "Systems Architect, Machine Learning Engineer, Quantitative Analyst, Algorithm Developer."
+      },
+      {
+        key: 'pcb', name: "Medical, Life Sciences & Environmental Tech (PCB)", traits: ['H', 'C'],
+        icon: 'fa-dna', color: 'emerald',
+        courses: "MBBS, BDS, B.Pharm, B.Sc Biotechnology, Biomedical Sciences, Environmental Ecology, Agricultural Sciences, Forensic Science.",
+        careers: "Medical Specialist, Clinical Research Scientist, Environmental Consultant, Geneticist."
+      },
+      {
+        key: 'commerce', name: "Commerce, Finance, Management & Analytics", traits: ['C', 'B'],
+        icon: 'fa-chart-line', color: 'amber',
+        courses: "BBA / BMS (IIM IPM Program), B.Com (Hons), BA Economics (Hons), CA / CS / CFA, FinTech &amp; Risk Analytics.",
+        careers: "Investment Banker, Venture Capitalist, Management Consultant, Corporate Strategist."
+      },
+      {
+        key: 'law', name: "Law, Humanities, Psychology & Public Policy", traits: ['F', 'A'],
+        icon: 'fa-scale-balanced', color: 'purple',
+        courses: "BA LLB / BBA LLB (5-Year Integrated at NLUs), BA (Hons) Psychology, International Relations, Mass Media &amp; Journalism.",
+        careers: "Corporate Lawyer, Civil Services (IAS/IFS), Behavioral Psychologist, Public Policy Specialist."
+      },
+      {
+        key: 'design', name: "Design, Architecture, Visual & Media Arts", traits: ['D', 'E', 'G'],
+        icon: 'fa-compass-drafting', color: 'rose',
+        courses: "B.Des (NID / UCEED - Product, UI/UX, Game Design), B.Arch, Fine Arts, Sound Engineering &amp; Audio Production.",
+        careers: "Interaction / UI-UX Designer, Spatial Architect, Sound Director, Creative Director."
+      }
+    ];
+
+    // State Tracking
+    let miActiveIdx = 0;
+    
+    // Blank by default — every student starts with no answers selected.
+    // null = not yet answered; the scoring logic treats null as 0.
+    const miAnswers = {
+      'A': [null, null, null, null, null, null, null, null],
+      'B': [null, null, null, null, null, null, null, null],
+      'C': [null, null, null, null, null, null, null, null],
+      'D': [null, null, null, null, null, null, null, null],
+      'E': [null, null, null, null, null, null, null, null],
+      'F': [null, null, null, null, null, null, null, null],
+      'G': [null, null, null, null, null, null, null, null],
+      'H': [null, null, null, null, null, null, null, null]
+    };
+
+    // Blank by default — no VAK option pre-selected for any of the 47 items.
+    let vakAnswers = {};
+
+    // Blank by default — no Brain Dominance pair pre-selected.
+    let brainAnswers = {};
+
+    const chartObjects = {};
+
+    // Validated categorical palette (see the dataviz color-formula: fixed hue
+    // order, never cycled or reassigned by rank) — used consistently across
+    // every chart in the report so the same category always reads as the
+    // same color everywhere it appears.
+    const VIZ_COLORS = {
+      blue: '#2a78d6',
+      orange: '#eb6834',
+      aqua: '#1baf7a',
+      yellow: '#eda100',
+      violet: '#4a3aa7',
+      slateMuted: '#cbd5e1'
+    };
+
+    // Builds a smooth top-to-bottom (or start-to-end, for radar) gradient fill
+    // for a chart dataset, so bars/areas read as a single richer surface
+    // instead of a flat block of color. Falls back to a solid color until the
+    // chart has computed its drawing area (first paint).
+    function makeVerticalGradient(ctx, chartArea, hexTop, hexBottom) {
+      if (!chartArea) return hexTop;
+      const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+      gradient.addColorStop(0, hexTop);
+      gradient.addColorStop(1, hexBottom);
+      return gradient;
+    }
+
+    function hexToRgba(hex, alpha) {
+      const h = hex.replace('#', '');
+      const r = parseInt(h.substring(0, 2), 16);
+      const g = parseInt(h.substring(2, 4), 16);
+      const b = parseInt(h.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // Draws each data value directly on the chart (bars, doughnut/pie slices).
+    // Registered once globally so every chart benefits, including in the
+    // static PDF export where hover tooltips are never visible.
+    const valueLabelPlugin = {
+      id: 'valueLabelPlugin',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, dsIndex) => {
+          const meta = chart.getDatasetMeta(dsIndex);
+          if (meta.hidden) return;
+          ctx.save();
+          ctx.font = '700 10px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          if (chart.config.type === 'bar') {
+            ctx.fillStyle = '#1E293B';
+            meta.data.forEach((bar, i) => {
+              const raw = dataset.data[i];
+              if (raw === undefined || raw === null) return;
+              const label = typeof raw === 'number' && !Number.isInteger(raw) ? raw.toFixed(1) : raw;
+              if (chart.options.indexAxis === 'y') {
+                ctx.textAlign = 'left';
+                ctx.fillText(label, bar.x + 6, bar.y);
+              } else {
+                ctx.textAlign = 'center';
+                ctx.fillText(label, bar.x, bar.y - 8);
+              }
+            });
+          } else if (chart.config.type === 'doughnut' || chart.config.type === 'pie') {
+            const total = dataset.data.reduce((a, b) => a + parseFloat(b || 0), 0) || 1;
+            meta.data.forEach((arc, i) => {
+              const raw = parseFloat(dataset.data[i] || 0);
+              if (!raw) return;
+              const pct = ((raw / total) * 100).toFixed(0);
+              const pos = arc.tooltipPosition();
+              ctx.fillStyle = '#ffffff';
+              ctx.font = '800 11px Inter, sans-serif';
+              ctx.fillText(`${pct}%`, pos.x, pos.y);
+            });
+          }
+          ctx.restore();
+        });
+      }
+    };
+    if (typeof Chart !== 'undefined') {
+      Chart.register(valueLabelPlugin);
+      Chart.defaults.font.family = "'Inter', sans-serif";
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMITabs();
+      renderCurrentMISection();
+      renderVAKList();
+      renderBrainList();
+      buildMIEelaboratedPagesDOM();
+
+      // Default "Date of Evaluation" to today, and stop both date pickers
+      // from allowing a future date (a student can't be born, or be
+      // evaluated, tomorrow).
+      const todayISO = new Date().toISOString().split('T')[0];
+      const dobInput = document.getElementById('dob');
+      const evalDateInput = document.getElementById('evaluation-date');
+      if (dobInput) dobInput.max = todayISO;
+      if (evalDateInput) {
+        evalDateInput.max = todayISO;
+        evalDateInput.value = todayISO;
+      }
+    });
+
+    // Every question in every assessment is compulsory. Moving forward past
+    // an assessment (MI -> VAK -> Brain -> Report) is blocked here until it
+    // is fully answered; moving backward to review or edit is always allowed.
+    function switchMainTab(tab) {
+      const order = ['mi', 'vak', 'brain', 'report'];
+      const targetIdx = order.indexOf(tab);
+      let redirectFocus = null; // { type: 'vak'|'brain', id } — flashed after the panel switch
+
+      if (targetIdx > 0) {
+        const firstMI = getFirstUnansweredMI();
+        if (firstMI) {
+          showToast(`Please answer all Multiple Intelligence questions before continuing (${getMIUnansweredTotal()} remaining).`, "warning");
+          tab = 'mi';
+          redirectFocus = { type: 'mi', secId: firstMI.secId, qIdx: firstMI.qIdx };
+        } else if (targetIdx >= 2) {
+          const firstVAK = getFirstUnansweredVAK();
+          if (firstVAK) {
+            const remaining = 47 - Object.keys(vakAnswers).length;
+            showToast(`Please answer all VAK questions before continuing (${remaining} remaining).`, "warning");
+            tab = 'vak';
+            redirectFocus = { type: 'vak', id: firstVAK };
+          } else if (targetIdx >= 3) {
+            const firstBrain = getFirstUnansweredBrain();
+            if (firstBrain) {
+              const remaining = 21 - Object.keys(brainAnswers).length;
+              showToast(`Please answer all Brain Dominance pairs before continuing (${remaining} remaining).`, "warning");
+              tab = 'brain';
+              redirectFocus = { type: 'brain', id: firstBrain };
+            }
+          }
+        }
+      }
+
+      ['overview', 'profile', 'mi', 'vak', 'brain', 'report'].forEach(t => {
+        document.getElementById(`tab-panel-${t}`).classList.add('hidden');
+        const nav = document.getElementById(`tab-nav-${t}`);
+        if (nav) nav.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+      });
+
+      document.getElementById(`tab-panel-${tab}`).classList.remove('hidden');
+      const activeNav = document.getElementById(`tab-nav-${tab}`);
+      if (activeNav) {
+        activeNav.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs ring-1 ring-slate-200";
+      }
+
+      if (redirectFocus) {
+        if (redirectFocus.type === 'mi') {
+          const idx = MI_DATA.findIndex(s => s.id === redirectFocus.secId);
+          if (idx !== -1) setMISection(idx);
+          setTimeout(() => flashUnansweredMI(redirectFocus.secId, redirectFocus.qIdx), 50);
+        } else if (redirectFocus.type === 'vak') {
+          setTimeout(() => flashUnansweredItem('data-vak-q', redirectFocus.id), 50);
+        } else if (redirectFocus.type === 'brain') {
+          setTimeout(() => flashUnansweredItem('data-brain-q', redirectFocus.id), 50);
+        }
+      }
+
+      if (tab === 'report') {
+        generateCombinedReport();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Converts a native <input type="date"> value ("YYYY-MM-DD") into a
+    // readable "22 September 2026" style string for display in the report.
+    function formatDisplayDate(isoDateStr) {
+      if (!isoDateStr) return '—';
+      const [y, m, d] = isoDateStr.split('-').map(Number);
+      if (!y || !m || !d) return isoDateStr;
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function handleProfileSave(e) {
+      e.preventDefault();
+      playSelectionSound();
+      const name = document.getElementById('student-name').value.trim();
+      const dobRaw = document.getElementById('dob').value;
+      const grade = document.getElementById('class-grade').value.trim();
+      const evalDateRaw = document.getElementById('evaluation-date').value;
+      const school = document.getElementById('school-name').value.trim();
+      const contact = document.getElementById('contact-no').value.trim();
+      const fatherName = document.getElementById('father-name').value.trim();
+      const fatherContact = document.getElementById('father-contact-no').value.trim();
+
+      // Basic sanity check: date of birth should not be in the future,
+      // and should not fall after the evaluation date.
+      if (dobRaw && new Date(dobRaw) > new Date()) {
+        showToast("Date of Birth cannot be in the future.", "warning");
+        return;
+      }
+      if (dobRaw && evalDateRaw && new Date(dobRaw) > new Date(evalDateRaw)) {
+        showToast("Date of Birth must be before the Date of Evaluation.", "warning");
+        return;
+      }
+
+      document.getElementById('cov-student-name').innerText = name || '—';
+      document.getElementById('cov-class').innerText = grade || '—';
+      document.getElementById('cov-dob').innerText = formatDisplayDate(dobRaw);
+      document.getElementById('cov-date').innerText = formatDisplayDate(evalDateRaw);
+      document.getElementById('cov-school').innerText = school || '—';
+      document.getElementById('cov-contact').innerText = contact || '—';
+      document.getElementById('cov-father-name').innerText = fatherName || '—';
+      document.getElementById('cov-father-contact').innerText = fatherContact || '—';
+
+      showToast("Profile information updated!", "success");
+      switchMainTab('mi');
+    }
+
+    function renderMITabs() {
+      const container = document.getElementById('mi-section-tabs');
+      container.innerHTML = MI_DATA.map((sec, idx) => `
+        <button onclick="setMISection(${idx})" class="px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${idx === miActiveIdx ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+          Section ${sec.id} (${sec.short})
+        </button>
+      `).join('');
+    }
+
+    function setMISection(idx) {
+      playSelectionSound();
+      miActiveIdx = idx;
+      renderMITabs();
+      renderCurrentMISection();
+    }
+
+    function renderCurrentMISection() {
+      const sec = MI_DATA[miActiveIdx];
+      const answeredCount = miAnswers[sec.id].filter(v => v !== null && v !== undefined).length;
+      document.getElementById('mi-section-heading').innerText = `Section ${sec.id}: ${sec.name}`;
+      document.getElementById('mi-section-answered').innerText = answeredCount;
+
+      const container = document.getElementById('mi-questions-container');
+      container.innerHTML = sec.questions.map((q, qIdx) => {
+        const currentVal = miAnswers[sec.id][qIdx];
+        const isUnanswered = currentVal === null || currentVal === undefined;
+        return `
+        <div data-mi-q="${sec.id}-${qIdx}" class="p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition ${isUnanswered ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'}">
+          <span class="font-medium text-slate-800">
+            ${qIdx + 1}. ${q}
+            ${isUnanswered ? '<span class="ml-1.5 text-rose-500 font-bold" title="Required">*</span>' : ''}
+          </span>
+          <div class="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
+            ${[1, 2, 3, 4].map(pt => {
+              const isSelected = currentVal === pt;
+              return `
+              <button onclick="recordMIScore('${sec.id}', ${qIdx}, ${pt})" class="w-8 h-8 rounded-lg font-bold border transition flex items-center justify-center ${
+                isSelected
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 scale-105 font-black'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+              }">
+                ${pt}
+              </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        `;
+      }).join('');
+
+      document.getElementById('mi-prev-btn').disabled = miActiveIdx === 0;
+      if (miActiveIdx === MI_DATA.length - 1) {
+        document.getElementById('mi-next-btn').classList.add('hidden');
+        document.getElementById('mi-finish-btn').classList.remove('hidden');
+      } else {
+        document.getElementById('mi-next-btn').classList.remove('hidden');
+        document.getElementById('mi-finish-btn').classList.add('hidden');
+      }
+    }
+
+    function recordMIScore(secId, qIdx, score) {
+      playSelectionSound();
+      miAnswers[secId][qIdx] = score;
+      renderCurrentMISection();
+    }
+
+    function prevMISection() {
+      if (miActiveIdx > 0) setMISection(miActiveIdx - 1);
+    }
+
+    // Every question is compulsory: block moving to the next section until
+    // all 8 statements in the current section have been rated.
+    function nextMISection() {
+      const sec = MI_DATA[miActiveIdx];
+      const qIdx = sec.questions.findIndex((_, i) => miAnswers[sec.id][i] === null || miAnswers[sec.id][i] === undefined);
+      if (qIdx !== -1) {
+        showToast("Please answer all 8 statements in this section before continuing.", "warning");
+        flashUnansweredMI(sec.id, qIdx);
+        return;
+      }
+      if (miActiveIdx < MI_DATA.length - 1) setMISection(miActiveIdx + 1);
+    }
+
+    // Scrolls to and briefly highlights a specific unanswered MI question.
+    function flashUnansweredMI(secId, qIdx) {
+      const el = document.querySelector(`[data-mi-q="${secId}-${qIdx}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-rose-500');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500'), 1800);
+    }
+
+    // Returns { secId, qIdx } for the first unanswered MI question across all
+    // 8 sections (in section order), or null if all 64 are answered.
+    function getFirstUnansweredMI() {
+      for (const sec of MI_DATA) {
+        const qIdx = sec.questions.findIndex((_, i) => miAnswers[sec.id][i] === null || miAnswers[sec.id][i] === undefined);
+        if (qIdx !== -1) return { secId: sec.id, qIdx };
+      }
+      return null;
+    }
+
+    // Total number of unanswered MI questions across all 8 sections.
+    function getMIUnansweredTotal() {
+      let count = 0;
+      MI_DATA.forEach(sec => {
+        miAnswers[sec.id].forEach(v => { if (v === null || v === undefined) count++; });
+      });
+      return count;
+    }
+
+    // Returns the id of the first unanswered VAK item, or null if all 47 are answered.
+    function getFirstUnansweredVAK() {
+      const item = VAK_QUESTIONS.find(q => !vakAnswers[q.id]);
+      return item ? item.id : null;
+    }
+
+    // Returns the id of the first unanswered Brain Dominance pair, or null if all 21 are answered.
+    function getFirstUnansweredBrain() {
+      const pair = BRAIN_PAIRS.find(p => !brainAnswers[p.id]);
+      return pair ? pair.id : null;
+    }
+
+    // Scrolls to and briefly highlights a specific unanswered VAK or Brain item.
+    function flashUnansweredItem(attr, id) {
+      const el = document.querySelector(`[${attr}="${id}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-rose-500');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500'), 1800);
+    }
+
+    function renderVAKList() {
+      const container = document.getElementById('vak-questions-container');
+      container.innerHTML = VAK_QUESTIONS.map(item => {
+        const sel = vakAnswers[item.id];
+        const isUnanswered = !sel;
+        return `
+        <div data-vak-q="${item.id}" class="p-4 rounded-xl border text-xs transition ${isUnanswered ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'}">
+          <p class="font-bold text-slate-900 mb-2.5">
+            ${item.id}. ${item.prompt}
+            ${isUnanswered ? '<span class="ml-1.5 text-rose-500 font-bold" title="Required">*</span>' : ''}
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button onclick="setVAK(${item.id}, 'A')" class="p-3 border rounded-xl text-left transition flex items-start gap-2 ${
+              sel === 'A' 
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-bold' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 ${sel === 'A' ? 'bg-white text-emerald-700' : 'bg-slate-100 text-slate-600'}">A</span>
+              <span>${item.a}</span>
+            </button>
+
+            <button onclick="setVAK(${item.id}, 'B')" class="p-3 border rounded-xl text-left transition flex items-start gap-2 ${
+              sel === 'B' 
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-bold' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 ${sel === 'B' ? 'bg-white text-emerald-700' : 'bg-slate-100 text-slate-600'}">B</span>
+              <span>${item.b}</span>
+            </button>
+
+            <button onclick="setVAK(${item.id}, 'C')" class="p-3 border rounded-xl text-left transition flex items-start gap-2 ${
+              sel === 'C' 
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-bold' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 ${sel === 'C' ? 'bg-white text-emerald-700' : 'bg-slate-100 text-slate-600'}">C</span>
+              <span>${item.c}</span>
+            </button>
+          </div>
+        </div>
+        `;
+      }).join('');
+      updateVAKDisplays();
+    }
+
+    function setVAK(id, type) {
+      playSelectionSound();
+      vakAnswers[id] = type;
+      renderVAKList(); 
+    }
+
+    // Shows only a neutral completion count while the student is answering —
+    // no V/A/K breakdown or percentage, so results can't bias remaining answers.
+    function updateVAKDisplays() {
+      const answeredCount = Object.keys(vakAnswers).length;
+      document.getElementById('vak-answered-count').innerText = answeredCount;
+    }
+
+    function renderBrainList() {
+      const container = document.getElementById('brain-pairs-container');
+      container.innerHTML = BRAIN_PAIRS.map(item => {
+        const sel = brainAnswers[item.id];
+        const isUnanswered = !sel;
+        return `
+        <div data-brain-q="${item.id}" class="p-4 rounded-xl border text-xs transition ${isUnanswered ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'}">
+          <p class="font-bold text-slate-500 mb-2">
+            Item ${item.id} of 21
+            ${isUnanswered ? '<span class="ml-1.5 text-rose-500 font-bold" title="Required">*</span>' : ''}
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onclick="setBrain(${item.id}, 'A')" class="p-3 border rounded-xl text-left font-semibold transition flex items-center justify-between gap-2 ${
+              sel === 'A' 
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-bold' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${sel === 'A' ? 'bg-white text-emerald-700' : 'bg-slate-200 text-slate-700'}">A</span>
+                <span>${item.stmtA}</span>
+              </div>
+              ${sel === 'A' ? '<i class="fa-solid fa-circle-check text-white"></i>' : ''}
+            </button>
+
+            <button onclick="setBrain(${item.id}, 'B')" class="p-3 border rounded-xl text-left font-semibold transition flex items-center justify-between gap-2 ${
+              sel === 'B' 
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-bold' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${sel === 'B' ? 'bg-white text-emerald-700' : 'bg-slate-200 text-slate-700'}">B</span>
+                <span>${item.stmtB}</span>
+              </div>
+              ${sel === 'B' ? '<i class="fa-solid fa-circle-check text-white"></i>' : ''}
+            </button>
+          </div>
+        </div>
+        `;
+      }).join('');
+      updateBrainDisplays();
+    }
+
+    function setBrain(id, choice) {
+      playSelectionSound();
+      brainAnswers[id] = choice;
+      renderBrainList();
+    }
+
+    // Shows only a neutral completion count while the student is answering —
+    // no right/left-brain tendency percentage, so results can't bias remaining answers.
+    function updateBrainDisplays() {
+      const answeredCount = Object.keys(brainAnswers).length;
+      document.getElementById('brain-answered-count').innerText = answeredCount;
+    }
+
+    // Build Detailed Trait Pages (Pages 7 to 14)
+    function buildMIEelaboratedPagesDOM() {
+      const container = document.getElementById('mi-elaborated-pages-container');
+      container.innerHTML = MI_DATA.map((sec, idx) => {
+        const pgNum = idx + 8;
+        return `
+        <div class="report-page border border-slate-200 shadow-md rounded-2xl" id="report-page-${pgNum}">
+          <div>
+            <div class="flex items-center justify-between border-b pb-3 border-slate-200">
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center text-xs font-black">BM</span>
+                <div>
+                  <h2 class="text-xs font-black font-display text-slate-900 uppercase">Brain &amp; Mind</h2>
+                  <p class="text-[9px] font-bold text-slate-500">B&amp;M — The Experts</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Trait Diagnostic Profile</span>
+            </div>
+
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">
+                    Trait ${sec.id}
+                  </span>
+                  <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">${sec.tagline}</span>
+                </div>
+                <h2 class="text-2xl font-black font-display text-slate-900">${sec.name}</h2>
+              </div>
+              <div class="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0 shadow-sm">
+                <div class="w-full h-full cover-gradient-bg flex items-center justify-center"><div class="neural-grid-overlay"></div><i class="fa-solid ${{A:'fa-user-astronaut',B:'fa-people-group',C:'fa-square-root-variable',D:'fa-palette',E:'fa-person-running',F:'fa-book-open',G:'fa-music',H:'fa-leaf'}[sec.id] || 'fa-brain'} text-amber-400 text-3xl relative"></i></div>
+              </div>
+            </div>
+
+            <div class="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700 leading-snug shadow-sm">
+              <p>${sec.description}</p>
+            </div>
+
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+                <h4 class="text-[10.5px] font-black uppercase tracking-wider text-slate-800 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-fingerprint text-blue-600"></i> Core Characteristics
+                </h4>
+                <ul class="space-y-1 text-[10px] text-slate-600 leading-snug">
+                  ${sec.characteristics.map(c => `<li>&bull; ${c}</li>`).join('')}
+                </ul>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+                <h4 class="text-[10.5px] font-black uppercase tracking-wider text-slate-800 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-star text-amber-500"></i> Value Points &amp; Strengths
+                </h4>
+                <ul class="space-y-1 text-[10px] text-slate-600 leading-snug">
+                  ${sec.valuePoints.map(v => `<li>&bull; ${v}</li>`).join('')}
+                </ul>
+              </div>
+            </div>
+
+            <div class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+              <h4 class="text-[10.5px] font-black uppercase tracking-wider text-slate-800 mb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-trend-up text-emerald-600"></i> Actionable Growth Roadmap
+              </h4>
+              <ul class="space-y-1 text-[10px] text-slate-600 leading-snug">
+                ${sec.remedies.map(rem => `<li>&bull; ${rem}</li>`).join('')}
+              </ul>
+            </div>
+
+            <p class="mt-3 text-[9.5px] text-slate-400 italic leading-snug">
+              How to read the scores below: each of the 8 statements for this trait was rated 1 (Rarely) to 4 (Very Often); the raw score is the sum of all 8 responses, so it can range from 8 to 32.
+            </p>
+            <div class="mt-1.5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+              <div class="sm:col-span-5">
+                <h5 class="text-[10px] font-black uppercase tracking-wider text-slate-700 mb-2">Trait Scorecard</h5>
+                <table class="w-full text-[10px] text-left border-collapse border border-slate-200 bg-white rounded-lg overflow-hidden">
+                  <tbody id="page-${pgNum}-score-table" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
+                </table>
+              </div>
+              <div class="sm:col-span-7 h-36 flex items-center justify-center">
+                <canvas id="page-${pgNum}-barChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-200 text-[11px] text-slate-400 flex justify-between items-center">
+            <span>Brain and Mind Academy</span>
+            <span>Page ${pgNum} of 24</span>
+          </div>
+        </div>
+        `;
+      }).join('');
+    }
+
+    // ===================================================================
+    // DYNAMIC CAREER & SUBJECT RECOMMENDATION ENGINE
+    // Scores CAREER_CATALOG / STREAM_910 / STREAM_1112 against the
+    // student's own MI trait percentages so pages 6, 19 & 20 change
+    // per student instead of showing the same static content for everyone.
+    // ===================================================================
+    const REC_COLOR_CLASSES = {
+      blue:    { border: 'border-blue-600',    badgeBg: 'bg-blue-100',    badgeText: 'text-blue-800',    iconBg: 'bg-blue-600',    text: 'text-blue-800' },
+      emerald: { border: 'border-emerald-600', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-800', iconBg: 'bg-emerald-600', text: 'text-emerald-800' },
+      purple:  { border: 'border-purple-600',  badgeBg: 'bg-purple-100', badgeText: 'text-purple-800',  iconBg: 'bg-purple-600',  text: 'text-purple-800' },
+      amber:   { border: 'border-amber-600',   badgeBg: 'bg-amber-100',  badgeText: 'text-amber-800',   iconBg: 'bg-amber-600',   text: 'text-amber-800' },
+      rose:    { border: 'border-rose-600',    badgeBg: 'bg-rose-100',   badgeText: 'text-rose-800',    iconBg: 'bg-rose-600',    text: 'text-rose-800' },
+      teal:    { border: 'border-teal-600',    badgeBg: 'bg-teal-100',   badgeText: 'text-teal-800',    iconBg: 'bg-teal-600',    text: 'text-teal-800' },
+      indigo:  { border: 'border-indigo-600',  badgeBg: 'bg-indigo-100', badgeText: 'text-indigo-800',  iconBg: 'bg-indigo-600',  text: 'text-indigo-800' },
+      orange:  { border: 'border-orange-600',  badgeBg: 'bg-orange-100', badgeText: 'text-orange-800',  iconBg: 'bg-orange-600',  text: 'text-orange-800' }
+    };
+
+    function buildTraitPctMap(sortedMI) {
+      const map = {};
+      sortedMI.forEach(item => { map[item.id] = parseFloat(item.percentage); });
+      return map;
+    }
+
+    function traitNames(traitIds) {
+      return traitIds.map(id => {
+        const m = MI_DATA.find(x => x.id === id);
+        return m ? m.short : id;
+      }).join(' + ');
+    }
+
+    // Page 6: Top 5 recommended careers, ranked by the student's own scores.
+    function renderDynamicCareers(sortedMI) {
+      const el = document.getElementById('career-pathways-container');
+      if (!el) return;
+      const traitPct = buildTraitPctMap(sortedMI);
+      const ranked = CAREER_CATALOG.map(c => {
+        const fit = c.traits.reduce((sum, t) => sum + (traitPct[t] || 0), 0) / c.traits.length;
+        return { ...c, fit };
+      }).sort((a, b) => b.fit - a.fit).slice(0, 5);
+
+      el.innerHTML = ranked.map((c, idx) => {
+        const cls = REC_COLOR_CLASSES[c.color] || REC_COLOR_CLASSES.blue;
+        return `
+        <div class="p-4 bg-slate-50 border-l-4 ${cls.border} rounded-xl shadow-sm">
+          <div class="flex items-center justify-between mb-2 gap-2">
+            <strong class="text-sm font-bold text-slate-900"><i class="fa-solid ${c.icon} mr-1.5 ${cls.text}"></i>${idx + 1}. ${c.name}</strong>
+            <span class="text-[10px] font-bold px-2 py-0.5 ${cls.badgeBg} ${cls.badgeText} rounded whitespace-nowrap">${traitNames(c.traits)} &middot; ${c.fit.toFixed(0)}% Fit</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed">
+            <strong>Preferred Subjects (Class 11 &amp; 12):</strong> ${c.subjects}<br>
+            <strong>Undergraduate Courses:</strong> ${c.courses}
+          </p>
+        </div>`;
+      }).join('');
+    }
+
+    // Page 19: Class 9 & 10 subject-elective buckets, re-ordered & badged by fit.
+    // All 4 buckets are always shown (every student needs a full Class 9/10
+    // subject plan), but which one leads and its match badge change per student.
+    function renderDynamicStreams910(sortedMI) {
+      const el = document.getElementById('stream-910-container');
+      if (!el) return;
+      const traitPct = buildTraitPctMap(sortedMI);
+      const ranked = STREAM_910.map(s => {
+        const fit = s.traits.reduce((sum, t) => sum + (traitPct[t] || 0), 0) / s.traits.length;
+        return { ...s, fit };
+      }).sort((a, b) => b.fit - a.fit);
+      const topFit = ranked[0].fit;
+
+      el.innerHTML = ranked.map((s, idx) => {
+        const cls = REC_COLOR_CLASSES[s.color] || REC_COLOR_CLASSES.blue;
+        const isTop = idx === 0;
+        return `
+        <div class="p-4 bg-slate-50 border ${isTop ? 'border-2 ' + cls.border : 'border-slate-200'} rounded-2xl shadow-sm">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-lg ${cls.iconBg} text-white flex items-center justify-center text-sm font-bold"><i class="fa-solid ${s.icon}"></i></span>
+              <strong class="text-slate-900 font-bold text-sm">${s.name}</strong>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 ${cls.badgeBg} ${cls.badgeText} rounded whitespace-nowrap">${isTop ? 'Best Fit' : s.fit.toFixed(0) + '% Fit'}</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">${s.blurb}</p>
+          <ul class="space-y-1.5 text-xs text-slate-700">
+            ${s.items.map(it => `<li>&bull; ${it}</li>`).join('')}
+          </ul>
+        </div>`;
+      }).join('');
+    }
+
+    // Page 20: Class 11/12 & higher-education streams, re-ordered & badged by fit.
+    function renderDynamicStreams1112(sortedMI) {
+      const el = document.getElementById('stream-1112-container');
+      if (!el) return;
+      const traitPct = buildTraitPctMap(sortedMI);
+      const ranked = STREAM_1112.map(s => {
+        const fit = s.traits.reduce((sum, t) => sum + (traitPct[t] || 0), 0) / s.traits.length;
+        return { ...s, fit };
+      }).sort((a, b) => b.fit - a.fit);
+
+      el.innerHTML = ranked.map((s, idx) => {
+        const cls = REC_COLOR_CLASSES[s.color] || REC_COLOR_CLASSES.blue;
+        const isTop = idx === 0;
+        return `
+        <div class="p-4 rounded-xl bg-slate-50 border ${isTop ? 'border-2 ' + cls.border : 'border-slate-200'} shadow-sm">
+          <div class="flex items-center justify-between mb-2 gap-2">
+            <strong class="text-slate-900 text-sm font-bold flex items-center gap-2 ${cls.text}">
+              <i class="fa-solid ${s.icon}"></i> ${s.name}
+            </strong>
+            <span class="text-[10px] px-2 py-1 ${cls.badgeBg} ${cls.badgeText} rounded-full font-bold whitespace-nowrap">${isTop ? 'Best Fit' : s.fit.toFixed(0) + '% Fit'}</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            <strong>Top Graduation Courses:</strong> ${s.courses}<br>
+            <strong>Career Trajectories:</strong> ${s.careers}
+          </p>
+        </div>`;
+      }).join('');
+    }
+
+    // MAIN COMPILATION FUNCTION
+    function generateCombinedReport() {
+      // 1. Calculate Top 3 MI in % ONLY
+      const sortedMI = [...MI_DATA].map(item => {
+        const raw = miAnswers[item.id].reduce((a, b) => a + (b || 0), 0);
+        const pctOfMax = ((raw / 32) * 100).toFixed(1);
+        return {
+          ...item,
+          rawScore: raw,
+          percentage: `${pctOfMax}%`
+        };
+      }).sort((a, b) => b.rawScore - a.rawScore);
+
+      const top3 = sortedMI.slice(0, 3);
+      const container = document.getElementById('top-3-mi-container');
+      container.innerHTML = top3.map(item => `
+        <div class="flex items-center bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden p-4 gap-4 shadow-sm">
+          <div class="w-32 h-32 rounded-xl overflow-hidden flex-shrink-0">
+            <div class="w-full h-full cover-gradient-bg flex items-center justify-center"><div class="neural-grid-overlay"></div><i class="fa-solid ${{A:'fa-user-astronaut',B:'fa-people-group',C:'fa-square-root-variable',D:'fa-palette',E:'fa-person-running',F:'fa-book-open',G:'fa-music',H:'fa-leaf'}[item.id] || 'fa-brain'} text-amber-400 text-5xl relative"></i></div>
+          </div>
+          <div class="space-y-1.5 text-xs text-slate-700 flex-grow">
+            <h4 class="text-sm font-bold text-blue-900">
+              ${item.name} (${item.tagline}) - <span class="text-emerald-600 font-extrabold">${item.percentage}</span>
+            </h4>
+            <p class="leading-relaxed">${item.description}</p>
+            <p class="text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-lg mt-1 border border-amber-200">
+              <strong>Actionable Tip:</strong> ${item.actionableTip}
+            </p>
+          </div>
+        </div>
+      `).join('');
+
+      // 1b. Dynamic career & subject-stream recommendations, driven by this
+      // student's own sortedMI scores (changes per student).
+      renderDynamicCareers(sortedMI);
+      renderDynamicStreams910(sortedMI);
+      renderDynamicStreams1112(sortedMI);
+
+      // 2. Populate Detailed MI Pages (7 to 14)
+      MI_DATA.forEach((sec, idx) => {
+        const pgNum = idx + 8;
+        const tableBody = document.getElementById(`page-${pgNum}-score-table`);
+        if (tableBody) {
+          tableBody.innerHTML = sortedMI.map(item => `
+            <tr class="${item.id === sec.id ? 'bg-amber-100/60 font-bold' : ''}">
+              <td class="p-1.5 pl-2.5 text-[9.5px]">${item.short}</td>
+              <td class="p-1.5 pr-2.5 text-right font-black text-[9.5px]">${item.rawScore.toFixed(2)}</td>
+            </tr>
+          `).join('');
+        }
+        renderSingleMIBarChart(`page-${pgNum}-barChart`, sortedMI, sec.short);
+      });
+
+      // 3. Multiple Intelligence Radar Chart (Exec Summary)
+      const radarScores = MI_DATA.map(sec => miAnswers[sec.id].reduce((a, b) => a + (b || 0), 0));
+      const radarCtx = document.getElementById('miRadarCanvas').getContext('2d');
+      if (chartObjects['radar']) chartObjects['radar'].destroy();
+      chartObjects['radar'] = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: ['Intrapersonal', 'Interpersonal', 'Logical', 'Visual', 'Kinesthetic', 'Linguistic', 'Musical', 'Naturalist'],
+          datasets: [{
+            data: radarScores,
+            backgroundColor: (context) => {
+              const { chart } = context;
+              const { ctx, chartArea } = chart;
+              if (!chartArea) return hexToRgba(VIZ_COLORS.blue, 0.15);
+              const gradient = ctx.createRadialGradient(
+                (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2, 0,
+                (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2,
+                Math.min(chartArea.right - chartArea.left, chartArea.bottom - chartArea.top) / 2
+              );
+              gradient.addColorStop(0, hexToRgba(VIZ_COLORS.blue, 0.32));
+              gradient.addColorStop(1, hexToRgba(VIZ_COLORS.blue, 0.06));
+              return gradient;
+            },
+            borderColor: VIZ_COLORS.blue,
+            pointBackgroundColor: VIZ_COLORS.orange,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
+            pointRadius: 3.5,
+            pointHoverRadius: 4,
+            borderWidth: 2.5
+          }]
+        },
+        options: {
+          animation: false,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 0, max: 32,
+              ticks: { display: false },
+              grid: { color: '#E2E8F0' },
+              angleLines: { color: '#E2E8F0' },
+              pointLabels: { font: { size: 9, weight: '600' }, color: '#334155' }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 4. VAK Calculations & Charts
+      let vCount = 0, aCount = 0, kCount = 0;
+      Object.values(vakAnswers).forEach(val => {
+        if (val === 'A') vCount++;
+        if (val === 'B') aCount++;
+        if (val === 'C') kCount++;
+      });
+      const totVak = Math.max(1, vCount + aCount + kCount);
+      const vPct = ((vCount / totVak) * 100).toFixed(1);
+      const aPct = ((aCount / totVak) * 100).toFixed(1);
+      const kPct = ((kCount / totVak) * 100).toFixed(1);
+
+      document.getElementById('rep-page15-v').innerText = `${vPct}%`;
+      document.getElementById('rep-page15-a').innerText = `${aPct}%`;
+      document.getElementById('rep-page15-k').innerText = `${kPct}%`;
+
+      document.getElementById('rep-page17-v').innerText = vPct;
+      document.getElementById('rep-page17-a').innerText = aPct;
+      document.getElementById('rep-page17-k').innerText = kPct;
+
+      const donutCtx = document.getElementById('vakDonutCanvas').getContext('2d');
+      if (chartObjects['donut']) chartObjects['donut'].destroy();
+      chartObjects['donut'] = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: [`Visual (${vPct}%)`, `Auditory (${aPct}%)`, `Kinesthetic (${kPct}%)`],
+          datasets: [{
+            data: [vPct, aPct, kPct],
+            backgroundColor: [VIZ_COLORS.blue, VIZ_COLORS.orange, VIZ_COLORS.aqua],
+            hoverOffset: 6,
+            borderWidth: 3,
+            borderColor: '#ffffff',
+            borderRadius: 4,
+            spacing: 2
+          }]
+        },
+        options: {
+          animation: false,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9, weight: '600' }, padding: 12 } } }
+        }
+      });
+
+      const barCtx = document.getElementById('page15BarCanvas').getContext('2d');
+      if (chartObjects['vakBar']) chartObjects['vakBar'].destroy();
+      chartObjects['vakBar'] = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Visual', 'Auditory', 'Kinesthetic'],
+          datasets: [{
+            data: [vPct, aPct, kPct],
+            backgroundColor: (context) => {
+              const { chart, dataIndex } = context;
+              const { ctx, chartArea } = chart;
+              const hues = [VIZ_COLORS.blue, VIZ_COLORS.orange, VIZ_COLORS.aqua];
+              const hue = hues[dataIndex] || VIZ_COLORS.blue;
+              if (!chartArea) return hue;
+              const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+              gradient.addColorStop(0, hexToRgba(hue, 0.55));
+              gradient.addColorStop(1, hue);
+              return gradient;
+            },
+            borderRadius: 6,
+            barThickness: 22
+          }]
+        },
+        options: {
+          animation: false,
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          layout: { padding: { right: 34 } },
+          scales: {
+            x: { min: 0, max: 100, grid: { color: '#F1F5F9' }, ticks: { callback: v => v + '%', font: { size: 9 } } },
+            y: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 5. Brain Dominance Pie Chart & Classifications
+      let brainRightScore = 0;
+      BRAIN_PAIRS.forEach(pair => {
+        const c = brainAnswers[pair.id];
+        if (c === 'A' && pair.typeA === 'R') brainRightScore++;
+        if (c === 'B' && pair.typeB === 'R') brainRightScore++;
+      });
+      
+      const rightPct = ((brainRightScore / 21) * 100).toFixed(1);
+      const leftPct = (100 - parseFloat(rightPct)).toFixed(1);
+
+      document.getElementById('cov-left-pct').innerText = `${leftPct}%`;
+      document.getElementById('cov-right-pct').innerText = `${rightPct}%`;
+
+      let classificationText = "Middle Brain (43% – 62%)";
+      if (brainRightScore <= 4) classificationText = "Strong Left Brain (0% – 19%)";
+      else if (brainRightScore <= 8) classificationText = "Moderate Left Brain (24% – 38%)";
+      else if (brainRightScore <= 13) classificationText = "Middle Brain (43% – 62%)";
+      else if (brainRightScore <= 16) classificationText = "Moderate Right Brain (67% – 76%)";
+      else classificationText = "Strong Right Brain (81% – 100%)";
+
+      document.getElementById('brain-tagline').innerText = classificationText.split('(')[0].trim();
+      document.getElementById('rep-page16-score').innerText = `${rightPct}%`;
+      document.getElementById('rep-page16-classification').innerText = classificationText;
+      document.getElementById('rep-page17-brain').innerText = `${rightPct}%`;
+
+      const pieCtx = document.getElementById('brainPieCanvas').getContext('2d');
+      if (chartObjects['pie']) chartObjects['pie'].destroy();
+      chartObjects['pie'] = new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+          labels: [`Left Brain`, `Right Brain`],
+          datasets: [{
+            data: [leftPct, rightPct],
+            backgroundColor: [VIZ_COLORS.blue, VIZ_COLORS.violet],
+            hoverOffset: 6,
+            borderWidth: 3,
+            borderColor: '#ffffff',
+            borderRadius: 4,
+            spacing: 2
+          }]
+        },
+        options: {
+          animation: false,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9, weight: '600' }, padding: 12 } } }
+        }
+      });
+
+      const brainBarCtx = document.getElementById('page16BarCanvas').getContext('2d');
+      if (chartObjects['brainBar']) chartObjects['brainBar'].destroy();
+      chartObjects['brainBar'] = new Chart(brainBarCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Right-Brain %'],
+          datasets: [{
+            data: [rightPct],
+            backgroundColor: (context) => {
+              const { chart } = context;
+              const { ctx, chartArea } = chart;
+              if (!chartArea) return VIZ_COLORS.violet;
+              const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+              gradient.addColorStop(0, hexToRgba(VIZ_COLORS.violet, 0.55));
+              gradient.addColorStop(1, VIZ_COLORS.violet);
+              return gradient;
+            },
+            borderRadius: 6,
+            barThickness: 26
+          }]
+        },
+        options: {
+          animation: false,
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          layout: { padding: { right: 34 } },
+          scales: {
+            x: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#F1F5F9' } },
+            y: { grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 6. Master Scorecard (Page 17)
+      const page17MITable = document.getElementById('rep-page17-mi-table');
+      if (page17MITable) {
+        page17MITable.innerHTML = sortedMI.map(item => `
+          <tr>
+            <td class="p-2 pl-3 text-xs">${item.short}</td>
+            <td class="p-2 pr-3 text-right font-black text-xs">${item.rawScore.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Final Dynamic Summary
+      const dominantModality = (parseFloat(aPct) >= parseFloat(vPct) && parseFloat(aPct) >= parseFloat(kPct)) ? 'Auditory' : (parseFloat(vPct) >= parseFloat(kPct)) ? 'Visual' : 'Kinesthetic';
+      const candidateName = (document.getElementById('cov-student-name').innerText.trim() && document.getElementById('cov-student-name').innerText.trim() !== '—')
+        ? document.getElementById('cov-student-name').innerText.trim()
+        : "The candidate";
+
+      const narrative = `The psychometric assessment for ${candidateName} exhibits peak strengths in ${top3[0].name} and ${top3[1].name}. With a prominent ${dominantModality} sensory preference (${dominantModality === 'Auditory' ? aPct : dominantModality === 'Visual' ? vPct : kPct}%) and a ${classificationText.split('(')[0].trim()} hemispheric orientation, the student excels when learning incorporates ${dominantModality === 'Auditory' ? 'verbal recaps and discussion forums' : dominantModality === 'Visual' ? 'mind maps and graphic organizers' : 'tactile models and movement'}.`;
+
+      document.getElementById('rep-page17-counselor-narrative').innerText = narrative;
+
+      // ===================================================================
+      // FINAL COMPREHENSIVE SUMMARY (Page 20) — derived cross-analysis
+      // ===================================================================
+      const fsArchetypeTitleEl = document.getElementById('fs-archetype-title');
+      const fsArchetypeDescEl = document.getElementById('fs-archetype-desc');
+      const fsTableEl = document.getElementById('fs-consolidated-table');
+      const fsBalanceLabelEl = document.getElementById('fs-balance-label');
+      const fsBalanceDescEl = document.getElementById('fs-balance-desc');
+      const fsSecondaryListEl = document.getElementById('fs-secondary-list');
+      const fsStrategyListEl = document.getElementById('fs-strategy-list');
+      const fsFinalNarrativeEl = document.getElementById('fs-final-narrative');
+
+      const miAnsweredCount = Object.values(miAnswers).flat().filter(v => v !== null).length;
+      const vakAnsweredCount = Object.keys(vakAnswers).length;
+      const brainAnsweredCount = Object.keys(brainAnswers).length;
+      const allComplete = miAnsweredCount === 64 && vakAnsweredCount === 47 && brainAnsweredCount === 21;
+
+      if (!allComplete) {
+        const missing = [];
+        if (miAnsweredCount < 64) missing.push(`Multiple Intelligences (${miAnsweredCount}/64 answered)`);
+        if (vakAnsweredCount < 47) missing.push(`VAK Learning Style (${vakAnsweredCount}/47 answered)`);
+        if (brainAnsweredCount < 21) missing.push(`Brain Dominance (${brainAnsweredCount}/21 answered)`);
+
+        fsArchetypeTitleEl.innerText = 'Assessment In Progress';
+        fsArchetypeDescEl.innerText = `Complete the remaining sections to generate the full cognitive archetype and personalized strategy: ${missing.join(', ')}.`;
+        fsTableEl.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400 italic">Consolidated results will appear here once all three assessments are complete.</td></tr>`;
+        fsBalanceLabelEl.innerText = 'Pending';
+        fsBalanceDescEl.innerText = 'Complete the Multiple Intelligence assessment to calculate the balance index.';
+        fsSecondaryListEl.innerHTML = `<li class="text-slate-400 italic">Pending</li>`;
+        fsStrategyListEl.innerHTML = `<li class="text-slate-400 italic">Pending — complete the VAK and Brain Dominance assessments.</li>`;
+        fsFinalNarrativeEl.innerText = 'Complete all three assessments (MI, VAK, Brain Dominance) to generate the final consolidated recommendation.';
+      } else {
+        const dominantPct = parseFloat(dominantModality === 'Auditory' ? aPct : dominantModality === 'Visual' ? vPct : kPct);
+        const brainLabel = classificationText.split('(')[0].trim();
+
+        // Cognitive Profile Archetype
+        const brainLean = brainRightScore >= 14 ? 'right-brain, creative-intuitive'
+          : brainRightScore <= 8 ? 'left-brain, structured-analytical'
+          : 'balanced, dual-hemisphere';
+        fsArchetypeTitleEl.innerText = `The ${top3[0].tagline} ${dominantModality} Learner`;
+        fsArchetypeDescEl.innerText = `${candidateName} combines ${top3[0].name.toLowerCase()} with a ${dominantModality.toLowerCase()} sensory preference and a ${brainLean} thinking style — a profile that responds well to ${top3[0].tagline.toLowerCase()} thinking expressed through ${dominantModality.toLowerCase()} learning channels.`;
+
+        // Consolidated Scorecard
+        fsTableEl.innerHTML = `
+          <tr>
+            <td class="p-2.5 pl-3">Top Intelligence</td>
+            <td class="p-2.5">${top3[0].name} (${top3[0].tagline})</td>
+            <td class="p-2.5 pr-3 text-right font-black text-blue-700">${top3[0].percentage}</td>
+          </tr>
+          <tr>
+            <td class="p-2.5 pl-3">Secondary Intelligence</td>
+            <td class="p-2.5">${top3[1].name} (${top3[1].tagline})</td>
+            <td class="p-2.5 pr-3 text-right font-black text-blue-700">${top3[1].percentage}</td>
+          </tr>
+          <tr>
+            <td class="p-2.5 pl-3">Dominant Learning Style</td>
+            <td class="p-2.5">${dominantModality}</td>
+            <td class="p-2.5 pr-3 text-right font-black text-emerald-700">${dominantPct.toFixed(1)}%</td>
+          </tr>
+          <tr>
+            <td class="p-2.5 pl-3">Brain Orientation</td>
+            <td class="p-2.5">${brainLabel}</td>
+            <td class="p-2.5 pr-3 text-right font-black text-purple-700">${rightPct}%</td>
+          </tr>
+        `;
+
+        // Intelligence Balance Index — derived from the spread of the 8 raw scores
+        const maxRaw = sortedMI[0].rawScore;
+        const minRaw = sortedMI[sortedMI.length - 1].rawScore;
+        const range = maxRaw - minRaw;
+        let balanceLabel, balanceDesc;
+        if (range <= 6) {
+          balanceLabel = 'Well-Rounded Profile';
+          balanceDesc = `A narrow spread of ${range} points across the 8 intelligences (highest ${maxRaw}, lowest ${minRaw}) suggests fairly even development across all cognitive domains, without one trait dominating.`;
+        } else if (range <= 14) {
+          balanceLabel = 'Moderately Specialized';
+          balanceDesc = `A spread of ${range} points (highest ${maxRaw}, lowest ${minRaw}) shows a few clear strengths alongside more typical areas — a common, workable profile.`;
+        } else {
+          balanceLabel = 'Highly Specialized Profile';
+          balanceDesc = `A wide spread of ${range} points (highest ${maxRaw}, lowest ${minRaw}) indicates a strongly focused profile — pronounced strengths in a few areas, with clear room to grow in others.`;
+        }
+        fsBalanceLabelEl.innerText = balanceLabel;
+        fsBalanceDescEl.innerText = balanceDesc;
+
+        // Supporting Intelligences — ranks 4 to 6
+        const midTier = sortedMI.slice(3, 6);
+        fsSecondaryListEl.innerHTML = midTier.map(item => `<li>&bull; <strong>${item.short}</strong> — ${item.percentage}</li>`).join('');
+
+        // Personalized Learning Strategy — derived from VAK x Brain Dominance
+        const vakTips = {
+          'Visual': ['Convert notes into diagrams, mind maps and color-coded charts.', 'Watch visual or video explanations before reading dense text.'],
+          'Auditory': ['Record lectures and replay them; discuss concepts out loud with peers.', 'Use rhythm, mnemonics, or reading aloud to lock in facts.'],
+          'Kinesthetic': ['Learn through hands-on models, experiments and real practice.', 'Take short movement breaks between study blocks to stay focused.']
+        };
+        const brainTip = brainRightScore >= 14
+          ? 'Allow room for creative, non-linear exploration rather than forcing a rigid timetable.'
+          : brainRightScore <= 8
+            ? 'Use structured timetables, checklists and clear step-by-step study plans.'
+            : 'Mix structured planning with open-ended creative exploration for the best results.';
+        const strategyItems = [...vakTips[dominantModality], brainTip, top3[0].actionableTip];
+        fsStrategyListEl.innerHTML = strategyItems.map(t => `<li>&bull; ${t}</li>`).join('');
+
+        // Overall Recommendation
+        fsFinalNarrativeEl.innerText = `${candidateName} presents a ${balanceLabel.toLowerCase()} with standout strength in ${top3[0].name.toLowerCase()} (${top3[0].percentage}), a ${dominantModality.toLowerCase()} learning preference (${dominantPct.toFixed(1)}%), and a ${brainLabel.toLowerCase()} thinking style (${rightPct}% right-brain tendency). Learning environments and subject choices that combine these three dimensions are likely to be the strongest fit — see the Personalized Learning Strategy above and the Recommended Career Pathways earlier in this report. This is a diagnostic snapshot, not a fixed label; interests and strengths continue to develop with age and experience.`;
+      }
+    }
+
+    function renderSingleMIBarChart(canvasId, scores, highlightShort) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (chartObjects[canvasId]) chartObjects[canvasId].destroy();
+
+      chartObjects[canvasId] = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: scores.map(s => s.short.substring(0, 4)),
+          datasets: [{
+            data: scores.map(s => s.rawScore),
+            // This page's own trait pops in the accent color; the other 7
+            // recede to a muted neutral — identity by highlight, not a
+            // rainbow of unrelated hues.
+            backgroundColor: (context) => {
+              const { chart, dataIndex } = context;
+              const { ctx: c, chartArea } = chart;
+              const isHighlighted = scores[dataIndex] && scores[dataIndex].short === highlightShort;
+              if (!chartArea) return isHighlighted ? VIZ_COLORS.orange : VIZ_COLORS.slateMuted;
+              const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              if (isHighlighted) {
+                gradient.addColorStop(0, hexToRgba(VIZ_COLORS.orange, 0.7));
+                gradient.addColorStop(1, VIZ_COLORS.orange);
+              } else {
+                gradient.addColorStop(0, '#e2e8f0');
+                gradient.addColorStop(1, VIZ_COLORS.slateMuted);
+              }
+              return gradient;
+            },
+            borderRadius: 4
+          }]
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 14 } },
+          scales: {
+            y: { min: 0, max: 32, ticks: { stepSize: 8, font: { size: 8 } }, grid: { color: '#F1F5F9' } },
+            x: { ticks: { font: { size: 8 } }, grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // ROBUST PDF DOWNLOAD SCRIPT WITH CANVAS MEMORY GUARDS
+    function downloadFullPDFReport() {
+      // 1. Ensure report has rendered
+      generateCombinedReport();
+
+      // Ensure report section is visible so html2canvas can compute geometry
+      const reportSection = document.getElementById('tab-panel-report');
+      const wasHidden = reportSection.classList.contains('hidden');
+      if (wasHidden) {
+        switchMainTab('report');
+      }
+
+      const element = document.getElementById('dossier-print-container');
+      const rawCovName = document.getElementById('cov-student-name').innerText.trim();
+      const studentName = (rawCovName && rawCovName !== '—' ? rawCovName : 'Student').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const downloadBtn = document.getElementById('btn-main-pdf-dl');
+      const originalBtnText = downloadBtn ? downloadBtn.innerHTML : '';
+
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Rendering PDF...`;
+      }
+
+      showToast("Preparing official 20-page PDF document...", "info");
+
+      // Lock every .report-page to a clean, gap-free 1140px slice for capture
+      element.classList.add('export-mode');
+
+      function restoreScreenLayout() {
+        element.classList.remove('export-mode');
+      }
+
+      // Give 250ms for layout & canvas redraw
+      setTimeout(() => {
+        const opt = {
+          margin:       [0, 0, 0, 0],
+          filename:     `Brain_and_Mind_Complete_Report_${studentName}.pdf`,
+          image:        { type: 'jpeg', quality: 0.95 },
+          html2canvas:  { 
+            scale: 1.25, 
+            useCORS: true, 
+            allowTaint: true,
+            logging: false,
+            letterRendering: true,
+            scrollY: 0
+          },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak:    { mode: ['css', 'legacy'] }
+        };
+
+        html2pdf().set(opt).from(element).outputPdf('blob').then((blob) => {
+          restoreScreenLayout();
+          return window.__bmaDownloads.save({ filename: opt.filename, data: blob });
+        }).then(() => {
+          restoreScreenLayout();
+          showToast("PDF saved.", "success");
+          if (downloadBtn) {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = originalBtnText;
+          }
+        }).catch(err => {
+          restoreScreenLayout();
+          console.error("html2pdf error:", err);
+          showToast(err && err.code === 'declined' ? "Download cancelled." : "The PDF could not be saved. Please try again.", "warning");
+          if (downloadBtn) {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = originalBtnText;
+          }
+        });
+      }, 300);
+    }
+
+    function showToast(msg, type = "info") {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `tab-content-enter px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold text-white flex items-center gap-2 pointer-events-auto ${type === 'success' ? 'bg-emerald-600' : type === 'warning' ? 'bg-amber-600' : 'bg-slate-900'}`;
+      t.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => { t.remove(); }, 3500);
+    }
+  </script>
+  <script>
+    // =====================================================================
+    // SIGN-IN, AUTOSAVE & RESUME
+    // Data layout (artifact db):
+    //   records/<accountId>                     summary of every assessment the account started
+    //   records/<accountId>/attempts/<attemptId> full answers for one assessment
+    // Each signed-in account reads and writes only its own records; the
+    // owner and editors can read every account's records for tracking.
+    // =====================================================================
+    window.BMA = window.BMA || {};
+    (function () {
+      const B = window.BMA;
+      const TOTALS = { mi: 64, vak: 47, brain: 21 };
+      const TOTAL_ALL = TOTALS.mi + TOTALS.vak + TOTALS.brain;
+      const PROFILE_FIELDS = {
+        name: 'student-name', dob: 'dob', grade: 'class-grade', evalDate: 'evaluation-date',
+        school: 'school-name', contact: 'contact-no', fatherName: 'father-name', fatherContact: 'father-contact-no'
+      };
+
+      const S = {
+        db: null, user: null, me: null, uid: null, isAdmin: false,
+        mySummary: {},            // attemptId -> summary (this account)
+        allRecords: [],           // [{uid, attempts}] for admins
+        profiles: {},
+        current: null,            // {uid, aid, readonly, createdAt}
+        currentTab: 'overview',
+        restoring: false,
+        saveTimer: null,
+        chain: Promise.resolve(),
+        scope: 'all',
+        confirmDelete: null
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+      // ---------------------------------------------------------------
+      // State capture / restore against the assessment's own globals
+      // ---------------------------------------------------------------
+      function countMI() {
+        let n = 0;
+        Object.values(miAnswers).forEach(arr => arr.forEach(v => { if (v !== null && v !== undefined) n++; }));
+        return n;
+      }
+      function counts() {
+        return { mi: countMI(), vak: Object.keys(vakAnswers).length, brain: Object.keys(brainAnswers).length };
+      }
+      function readProfile() {
+        const p = {};
+        Object.entries(PROFILE_FIELDS).forEach(([k, id]) => { const el = $(id); p[k] = el ? el.value : ''; });
+        return p;
+      }
+      function captureState() {
+        const mi = {};
+        Object.keys(miAnswers).forEach(k => { mi[k] = miAnswers[k].slice(); });
+        return {
+          profile: readProfile(),
+          mi, vak: Object.assign({}, vakAnswers), brain: Object.assign({}, brainAnswers),
+          miIdx: miActiveIdx, tab: S.currentTab,
+          introWatched: !!B.introWatched, walkthroughWatched: !!B.walkthroughWatched
+        };
+      }
+      function summaryOf(state, now) {
+        const c = counts();
+        const done = c.mi + c.vak + c.brain;
+        return {
+          name: state.profile.name || '', grade: state.profile.grade || '', school: state.profile.school || '',
+          mi: c.mi, vak: c.vak, brain: c.brain,
+          status: done === TOTAL_ALL ? 'complete' : (done === 0 && !state.profile.name ? 'new' : 'in_progress'),
+          tab: state.tab, walk: !!state.walkthroughWatched, createdAt: (S.current && S.current.createdAt) || now, updatedAt: now
+        };
+      }
+
+      function applyProfileToCover(p) {
+        const set = (id, v) => { const el = $(id); if (el) el.innerText = v || '—'; };
+        set('cov-student-name', (p.name || '').trim());
+        set('cov-class', (p.grade || '').trim());
+        set('cov-dob', p.dob ? formatDisplayDate(p.dob) : '');
+        set('cov-date', p.evalDate ? formatDisplayDate(p.evalDate) : '');
+        set('cov-school', (p.school || '').trim());
+        set('cov-contact', (p.contact || '').trim());
+        set('cov-father-name', (p.fatherName || '').trim());
+        set('cov-father-contact', (p.fatherContact || '').trim());
+      }
+
+      function loadState(data) {
+        const d = data || {};
+        Object.keys(miAnswers).forEach(k => {
+          const src = (d.mi && Array.isArray(d.mi[k])) ? d.mi[k] : [];
+          for (let i = 0; i < miAnswers[k].length; i++) {
+            const v = src[i];
+            miAnswers[k][i] = (v === undefined ? null : v);
+          }
+        });
+        vakAnswers = Object.assign({}, d.vak || {});
+        brainAnswers = Object.assign({}, d.brain || {});
+        const p = d.profile || {};
+        const todayISO = new Date().toISOString().split('T')[0];
+        Object.entries(PROFILE_FIELDS).forEach(([k, id]) => {
+          const el = $(id); if (!el) return;
+          el.value = p[k] || (k === 'evalDate' ? todayISO : '');
+        });
+        applyProfileToCover(readProfile());
+        miActiveIdx = Math.min(Math.max(0, d.miIdx | 0), MI_DATA.length - 1);
+        renderMITabs();
+        renderCurrentMISection();
+        renderVAKList();
+        renderBrainList();
+        // Assessments saved before the videos existed count the intro as seen once answering began.
+        const anyAnswers = countMI() + Object.keys(vakAnswers).length + Object.keys(brainAnswers).length > 0;
+        B.introWatched = d.introWatched === undefined ? anyAnswers : !!d.introWatched;
+        B.walkthroughWatched = !!d.walkthroughWatched;
+        if (typeof B.paintLocks === 'function') B.paintLocks();
+      }
+
+      // ---------------------------------------------------------------
+      // Saving
+      // ---------------------------------------------------------------
+      function setSaveStatus(kind, text) {
+        const el = $('save-status');
+        if (!el) return;
+        const icon = { saving: 'fa-rotate fa-spin', saved: 'fa-cloud', error: 'fa-triangle-exclamation', off: 'fa-cloud-arrow-up', view: 'fa-eye' }[kind] || 'fa-cloud';
+        const tone = { saving: 'text-slate-500', saved: 'text-emerald-700', error: 'text-rose-700', off: 'text-amber-700', view: 'text-slate-500' }[kind] || 'text-slate-500';
+        el.className = `hidden sm:flex items-center gap-1.5 text-[11px] font-bold ${tone}`;
+        el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(text)}</span>`;
+      }
+      function canSave() { return !!(S.db && S.uid && S.current && !S.current.readonly && S.current.uid === S.uid); }
+
+      function markDirty() {
+        if (S.restoring || !S.current) return;
+        if (!canSave()) return;
+        setSaveStatus('saving', 'Saving…');
+        clearTimeout(S.saveTimer);
+        S.saveTimer = setTimeout(flush, 900);
+      }
+
+      B.save = function () { markDirty(); };
+      function flush() {
+        clearTimeout(S.saveTimer); S.saveTimer = null;
+        if (!canSave()) return S.chain;
+        const cur = S.current;
+        const now = Date.now();
+        const state = captureState();
+        const summary = summaryOf(state, now);
+        const attemptRef = S.db.doc(`records/${S.uid}/attempts/${cur.aid}`);
+        const summaryRef = S.db.doc(`records/${S.uid}`);
+        S.chain = S.chain.then(async () => {
+          await attemptRef.set(Object.assign({}, state, { createdAt: cur.createdAt, updatedAt: now }));
+          S.mySummary = Object.assign({}, S.mySummary, { [cur.aid]: summary });
+          await summaryRef.set({ attempts: S.mySummary, updatedAt: now });
+          setSaveStatus('saved', 'Saved ' + new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+        }).catch(err => {
+          console.error('save failed', err);
+          const code = err && err.code;
+          setSaveStatus('error', code === 'quota_exceeded' ? 'Storage full – not saved' : 'Not saved – retrying on next answer');
+        });
+        return S.chain;
+      }
+
+      // Wrap the assessment's own actions so every change is saved.
+      function wrap(name, after) {
+        const orig = window[name];
+        if (typeof orig !== 'function') return;
+        window[name] = function () {
+          const r = orig.apply(this, arguments);
+          try { after && after.apply(this, arguments); } catch (e) { console.error(e); }
+          return r;
+        };
+      }
+      ['recordMIScore', 'setVAK', 'setBrain', 'setMISection'].forEach(n => wrap(n, markDirty));
+      wrap('handleProfileSave', markDirty);
+      wrap('switchMainTab', function () {
+        // switchMainTab may redirect to an earlier step; read what is showing now.
+        const shown = ['overview', 'profile', 'mi', 'vak', 'brain', 'report'].find(t => !$(`tab-panel-${t}`).classList.contains('hidden'));
+        if (shown) S.currentTab = shown;
+        markDirty();
+      });
+      document.addEventListener('input', (e) => { if (e.target && e.target.closest && e.target.closest('#student-form')) markDirty(); });
+      document.addEventListener('change', (e) => { if (e.target && e.target.closest && e.target.closest('#student-form')) markDirty(); });
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && S.saveTimer) flush(); });
+
+      // ---------------------------------------------------------------
+      // Screens
+      // ---------------------------------------------------------------
+      function showPortal() {
+        if (S.saveTimer) flush();
+        S.current = null;
+        $('portal').classList.remove('hidden');
+        $('app-main').classList.add('hidden');
+        $('step-nav').classList.add('hidden');
+        $('btn-main-pdf-dl').classList.add('hidden');
+        $('btn-portal').classList.add('hidden');
+        $('save-status').classList.add('hidden');
+        $('viewing-banner').classList.add('hidden');
+        renderList();
+        window.scrollTo({ top: 0 });
+      }
+      function showApp() {
+        $('portal').classList.add('hidden');
+        $('app-main').classList.remove('hidden');
+        $('step-nav').classList.remove('hidden');
+        $('btn-main-pdf-dl').classList.remove('hidden');
+        $('btn-portal').classList.remove('hidden');
+      }
+
+      function newId() {
+        return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      }
+
+      async function startNew() {
+        const now = Date.now();
+        S.current = { uid: S.uid, aid: newId(), readonly: false, createdAt: now };
+        S.restoring = B.restoring = true;
+        loadState({});
+        S.restoring = B.restoring = false;
+        showApp();
+        switchMainTab('overview');
+        if (canSave()) { setSaveStatus('saving', 'Creating…'); flush(); }
+        else setSaveStatus('off', 'Not being saved');
+      }
+
+      async function openAttempt(uid, aid) {
+        if (!S.db) return;
+        let snap;
+        try { snap = await S.db.doc(`records/${uid}/attempts/${aid}`).get(); }
+        catch (e) { showToast('That assessment could not be loaded. Check your connection and try again.', 'warning'); return; }
+        if (!snap.exists) { showToast('That assessment is no longer available.', 'warning'); return; }
+        const data = snap.data();
+        const readonly = uid !== S.uid;
+        S.current = { uid, aid, readonly, createdAt: data.createdAt || Date.now() };
+        S.restoring = B.restoring = true;
+        loadState(data);
+        showApp();
+        const target = data.tab || 'overview';
+        switchMainTab(target);
+        S.restoring = B.restoring = false;
+        if (readonly) {
+          setSaveStatus('view', 'Viewing only');
+          const b = $('viewing-banner');
+          const ps = await S.user.profiles([uid]);
+          $('viewing-banner-text').textContent = `You are viewing an assessment started by ${ps[uid] && ps[uid].name || 'another account'}. Changes you make here are not saved.`;
+          b.classList.remove('hidden');
+        } else {
+          $('viewing-banner').classList.add('hidden');
+          setSaveStatus('saved', 'All answers saved');
+          if (target !== 'report') showToast('Welcome back. You are on the step where you left off.', 'success');
+        }
+      }
+
+      async function deleteAttempt(aid) {
+        if (!S.db || !S.uid) return;
+        try {
+          await S.chain;
+          await S.db.doc(`records/${S.uid}/attempts/${aid}`).delete();
+          const next = Object.assign({}, S.mySummary); delete next[aid];
+          S.mySummary = next;
+          await S.db.doc(`records/${S.uid}`).set({ attempts: next, updatedAt: Date.now() });
+          showToast('Assessment deleted.', 'success');
+        } catch (e) {
+          showToast('The assessment could not be deleted. Try again.', 'warning');
+        }
+        S.confirmDelete = null;
+        renderList();
+      }
+
+      // ---------------------------------------------------------------
+      // Portal list & tracker
+      // ---------------------------------------------------------------
+      function relTime(ts) {
+        if (!ts) return '—';
+        const diff = (Date.now() - ts) / 1000;
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+        return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+
+      function allRows() {
+        const rows = [];
+        if (S.isAdmin) {
+          S.allRecords.forEach(r => Object.entries(r.attempts || {}).forEach(([aid, s]) => rows.push({ uid: r.uid, aid, s })));
+          // Own records may be newer locally than the collection snapshot.
+          const own = rows.filter(r => r.uid !== S.uid);
+          Object.entries(S.mySummary).forEach(([aid, s]) => own.push({ uid: S.uid, aid, s }));
+          return own;
+        }
+        Object.entries(S.mySummary).forEach(([aid, s]) => rows.push({ uid: S.uid, aid, s }));
+        return rows;
+      }
+
+      function statusPill(s) {
+        if (s.status === 'complete' && s.walk) return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]"><i class="fa-solid fa-circle-check"></i>Complete · report unlocked</span>';
+        if (s.status === 'complete') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]"><i class="fa-solid fa-circle-check"></i>Complete</span>';
+        if (s.status === 'new') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px]">Not started</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px]"><i class="fa-solid fa-hourglass-half"></i>In progress</span>';
+      }
+
+      function progressCell(s) {
+        const seg = (n, t, color) => `<div class="h-1.5 rounded-full bg-slate-100 overflow-hidden" style="flex:${t}"><div class="h-full ${color}" style="width:${Math.round(((n || 0) / t) * 100)}%"></div></div>`;
+        const pct = Math.round((((s.mi || 0) + (s.vak || 0) + (s.brain || 0)) / TOTAL_ALL) * 100);
+        return `<div class="w-56">
+          <div class="flex items-center gap-1 mb-1">${seg(s.mi, TOTALS.mi, 'bg-purple-600')}${seg(s.vak, TOTALS.vak, 'bg-emerald-600')}${seg(s.brain, TOTALS.brain, 'bg-sky-600')}</div>
+          <div class="flex justify-between text-[10px] text-slate-500 font-semibold tabular-nums">
+            <span>MI ${s.mi || 0}/${TOTALS.mi} · VAK ${s.vak || 0}/${TOTALS.vak} · Brain ${s.brain || 0}/${TOTALS.brain}</span><span class="font-bold text-slate-700">${pct}%</span>
+          </div></div>`;
+      }
+
+      async function renderList() {
+        if ($('portal').classList.contains('hidden')) return;
+        const q = ($('portal-search').value || '').trim().toLowerCase();
+        let rows = allRows();
+        if (S.isAdmin && S.scope === 'mine') rows = rows.filter(r => r.uid === S.uid);
+        if (q) rows = rows.filter(r => [r.s.name, r.s.grade, r.s.school].join(' ').toLowerCase().includes(q));
+        rows.sort((a, b) => (b.s.updatedAt || 0) - (a.s.updatedAt || 0));
+
+        const uids = [...new Set(rows.map(r => r.uid))];
+        const ps = (S.user && uids.length) ? await S.user.profiles(uids) : {};
+
+        // Summary tiles for admins (across everyone, ignoring the search box)
+        if (S.isAdmin) {
+          const everyone = allRows();
+          const complete = everyone.filter(r => r.s.status === 'complete').length;
+          const prog = everyone.filter(r => r.s.status !== 'complete').length;
+          const accounts = new Set(everyone.map(r => r.uid)).size;
+          const avg = everyone.length ? Math.round(everyone.reduce((a, r) => a + ((r.s.mi || 0) + (r.s.vak || 0) + (r.s.brain || 0)) / TOTAL_ALL, 0) / everyone.length * 100) : 0;
+          const tile = (label, val, sub, tone) => `<div class="bg-white rounded-2xl border border-slate-200 p-4"><div class="text-[10px] uppercase tracking-wider font-bold text-slate-500">${label}</div><div class="text-2xl font-black font-display tabular-nums ${tone}">${val}</div><div class="text-[11px] text-slate-500">${sub}</div></div>`;
+          $('portal-stats').innerHTML =
+            tile('Assessments', everyone.length, `from ${accounts} account${accounts === 1 ? '' : 's'}`, 'text-slate-900') +
+            tile('Completed', complete, 'dossier ready', 'text-emerald-700') +
+            tile('In progress', prog, 'can be resumed', 'text-amber-700') +
+            tile('Average progress', avg + '%', `of ${TOTAL_ALL} questions`, 'text-blue-700');
+          $('portal-stats').classList.remove('hidden');
+        }
+
+        document.querySelectorAll('.col-account').forEach(el => el.classList.toggle('hidden', !S.isAdmin));
+        $('portal-empty').classList.toggle('hidden', rows.length > 0);
+        if (!rows.length && q) {
+          $('portal-empty').querySelector('h3').textContent = 'No matching candidates';
+          $('portal-empty').querySelector('p').textContent = 'Try a different name, class or school.';
+        } else {
+          $('portal-empty').querySelector('h3').textContent = 'No assessments yet';
+          $('portal-empty').querySelector('p').textContent = 'Start a new assessment to begin. Every answer is saved to this account, so it can be finished across several sittings.';
+        }
+
+        $('portal-rows').innerHTML = rows.map(r => {
+          const s = r.s;
+          const mine = r.uid === S.uid;
+          const who = ps[r.uid] ? (ps[r.uid].name || 'Someone') : '';
+          const meta = [s.grade ? 'Class ' + s.grade : '', s.school].filter(Boolean).join(' · ');
+          let action;
+          if (!mine) {
+            action = `<button data-open="${esc(r.uid)}|${esc(r.aid)}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold">${s.status === 'complete' ? 'View dossier' : 'View'}</button>`;
+          } else if (S.confirmDelete === r.aid) {
+            action = `<span class="inline-flex items-center gap-1.5"><span class="text-[11px] text-rose-700 font-bold">Delete for good?</span>
+              <button data-del-yes="${esc(r.aid)}" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold">Delete</button>
+              <button data-del-no="1" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold">Keep</button></span>`;
+          } else {
+            const label = s.status === 'complete' ? 'Open dossier' : (s.status === 'new' ? 'Start' : 'Resume');
+            action = `<span class="inline-flex items-center gap-1.5">
+              <button data-open="${esc(r.uid)}|${esc(r.aid)}" class="px-3 py-1.5 ${s.status === 'complete' ? 'bg-slate-900 hover:bg-slate-800' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg font-bold">${label}</button>
+              <button data-del="${esc(r.aid)}" aria-label="Delete assessment" title="Delete" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button></span>`;
+          }
+          return `<tr class="hover:bg-slate-50/70">
+            <td class="px-5 sm:px-6 py-3">
+              <div class="font-bold text-slate-900 text-[13px]">${s.name ? esc(s.name) : '<span class="text-slate-400 italic font-semibold">Name not entered yet</span>'}</div>
+              <div class="text-[11px] text-slate-500">${esc(meta) || '&nbsp;'}</div>
+            </td>
+            <td class="px-3 py-3 col-account ${S.isAdmin ? '' : 'hidden'}">
+              <span class="inline-flex items-center gap-1.5"><img src="${ps[r.uid] ? esc(ps[r.uid].avatarUrl) : ''}" alt="" class="w-5 h-5 rounded-full"><span class="font-semibold text-slate-700 acct-name"></span>${mine ? '<span class="text-[10px] text-slate-400 font-bold">(you)</span>' : ''}</span>
+            </td>
+            <td class="px-3 py-3">${progressCell(s)}</td>
+            <td class="px-3 py-3">${statusPill(s)}</td>
+            <td class="px-3 py-3 text-slate-600 font-semibold whitespace-nowrap" title="${s.updatedAt ? esc(new Date(s.updatedAt).toLocaleString()) : ''}">${relTime(s.updatedAt)}</td>
+            <td class="px-5 sm:px-6 py-3 text-right whitespace-nowrap">${action}</td>
+          </tr>`;
+        }).join('');
+        // Names go in with textContent (they are other people's input).
+        const nameEls = $('portal-rows').querySelectorAll('.acct-name');
+        rows.forEach((r, i) => { if (nameEls[i]) nameEls[i].textContent = ps[r.uid] ? (ps[r.uid].name || 'Someone') : 'Someone'; });
+      }
+
+      $('portal-rows').addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.open) { const [uid, aid] = b.dataset.open.split('|'); openAttempt(uid, aid); }
+        else if (b.dataset.del) { S.confirmDelete = b.dataset.del; renderList(); }
+        else if (b.dataset.delYes) { deleteAttempt(b.dataset.delYes); }
+        else if (b.dataset.delNo) { S.confirmDelete = null; renderList(); }
+      });
+      $('portal-search').addEventListener('input', renderList);
+      document.querySelectorAll('.scope-btn').forEach(b => b.addEventListener('click', () => { S.scope = b.dataset.scope; paintScope(); renderList(); }));
+      function paintScope() {
+        document.querySelectorAll('.scope-btn').forEach(b => {
+          b.className = 'scope-btn px-3 py-1 rounded-lg ' + (b.dataset.scope === S.scope ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800');
+        });
+      }
+      $('btn-new-attempt').addEventListener('click', startNew);
+      $('btn-continue-unsaved').addEventListener('click', startNew);
+      $('btn-portal').addEventListener('click', showPortal);
+      setInterval(() => { if (!$('portal').classList.contains('hidden')) renderList(); }, 60000);
+
+      // ---------------------------------------------------------------
+      // Sign-in
+      // ---------------------------------------------------------------
+      function offlineMode(reason) {
+        $('portal-greeting').textContent = 'Welcome to your assessment';
+        $('portal-sub').textContent = 'Answer at your own pace. There are no right or wrong answers.';
+        $('portal-offline').classList.remove('hidden');
+        $('btn-new-attempt').classList.add('hidden');
+        $('portal-list-card').classList.add('hidden');
+        if (reason) console.info('Saving unavailable:', reason);
+      }
+
+      async function init() {
+        const c = window.claude;
+        if (!c || typeof c.use !== 'function') return offlineMode('not inside the viewer');
+        const [user, db] = await Promise.all([c.use('user'), c.use('db')]);
+        S.user = user; S.db = db;
+        if (!user || !db) return offlineMode('db or user capability unavailable');
+        S.me = await user.me();
+        S.uid = S.me.id;
+        if (!S.uid) return offlineMode('no signed-in identity');
+        S.isAdmin = !!(S.me.isOwner || S.me.canEdit);
+
+        $('portal-greeting').textContent = S.me.name ? `Welcome, ${S.me.name.split(' ')[0]}` : 'Welcome back';
+        $('portal-sub').textContent = S.isAdmin
+          ? 'Track every candidate’s progress below. Anyone you share this page with signs in with their own account, and their answers save automatically so they can resume later.'
+          : 'You are signed in. Your answers save automatically as you go, so you can close this page and resume from the same question later.';
+        $('portal-avatar').src = S.me.avatarUrl;
+        $('portal-account-name').textContent = S.me.name || 'Signed in';
+        $('portal-account-role').textContent = S.me.isOwner ? 'Owner · sees all candidates' : (S.isAdmin ? 'Editor · sees all candidates' : 'Candidate');
+        $('portal-account').classList.remove('hidden');
+        $('portal-account').classList.add('flex');
+        $('acct-chip-img').src = S.me.avatarUrl;
+        $('acct-chip-name').textContent = S.me.name || 'Signed in';
+        $('acct-chip').classList.remove('hidden');
+        $('acct-chip').classList.add('sm:flex');
+
+        if (S.isAdmin) {
+          $('portal-list-title').textContent = 'Candidate progress';
+          $('portal-list-sub').textContent = 'Every assessment started on this page, across all signed-in accounts.';
+          $('portal-scope').classList.remove('hidden');
+          paintScope();
+        }
+
+        // Load this account's records before allowing new writes.
+        const summaryRef = db.doc(`records/${S.uid}`);
+        try {
+          const snap = await summaryRef.get();
+          S.mySummary = (snap.exists && snap.data().attempts) || {};
+        } catch (e) {
+          console.error(e);
+          return offlineMode('could not read saved records');
+        }
+        $('portal-list-card').classList.remove('hidden');
+        $('btn-new-attempt').disabled = false;
+        renderList();
+
+        summaryRef.onSnapshot((snap) => {
+          if (snap.metadata.hasPendingWrites) return;
+          S.mySummary = (snap.exists && snap.data().attempts) || {};
+          renderList();
+        }, (err) => console.warn('summary listener stopped', err));
+
+        if (S.isAdmin) {
+          db.collection('records').onSnapshot((qs) => {
+            S.allRecords = qs.docs.map(d => ({ uid: d.id, attempts: (d.data() || {}).attempts || {} }));
+            renderList();
+          }, (err) => console.warn('tracker listener stopped', err));
+        }
+      }
+
+      showPortal();
+      init().catch(err => { console.error(err); offlineMode('startup error'); });
+    })();
+
+    // PDF download through the viewer's save dialog (pages cannot start downloads themselves).
+    (function () {
+      const orig = window.downloadFullPDFReport;
+      window.downloadFullPDFReport = async function () {
+        const downloads = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads') : null;
+        if (!downloads) { showToast('PDF download isn’t available in this view. Open the page in claude.ai to download it.', 'warning'); return; }
+        window.__bmaDownloads = downloads;
+        return orig.apply(this, arguments);
+      };
+    })();
+  </script>
+  <script>
+    // =====================================================================
+    // NARRATED VIDEOS
+    //   Introduction      after the personal details, before the MI section.
+    //   Report walkthrough on the report; the PDF download unlocks only
+    //                      after every chapter has been watched to the end.
+    // Both run in their own shadow roots so their styles never touch the report.
+    // =====================================================================
+    (function () {
+      const B = window.BMA = window.BMA || {};
+      const $ = (id) => document.getElementById(id);
+      const synth = window.speechSynthesis || null;
+      const FEMALE_HINTS = ['female','zira','aria','jenny','samantha','susan','victoria','karen','moira','tessa','fiona','serena','salli','joanna','ivy','kendra','kimberly','amy','emma','olivia','google us english'];
+      let voice = null;
+      function pickVoice() {
+        if (!synth) return;
+        const vs = synth.getVoices();
+        const fem = v => FEMALE_HINTS.some(h => v.name.toLowerCase().includes(h));
+        voice = vs.find(v => v.name.toLowerCase().includes('google') && fem(v) && v.lang && v.lang.startsWith('en'))
+          || vs.find(v => fem(v) && v.lang && v.lang.startsWith('en'))
+          || vs.find(v => v.lang && v.lang.startsWith('en')) || vs[0] || null;
+      }
+      if (synth) { try { synth.addEventListener('voiceschanged', pickVoice); } catch (e) {} pickVoice(); }
+
+      const INTRO_CSS = "\n:host{--navy:#0B1B3A;--navy2:#152C5C;--gold:#E9B949;--sky:#5FC7E0;--paper:#F6F3EA;\n --skin:#E8B994;--hair:#3B2A22;--blazer:#1F6F63;--blazerdk:#154F46;--blouse:#F3EADB;}\n*{box-sizing:border-box;}\n:host{display:block;height:100%;overflow:hidden;background:var(--navy);}\n.stage{font-family:'Inter',system-ui,sans-serif;}\n.stage{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;\n background:radial-gradient(ellipse at 50% 15%, var(--navy2), var(--navy) 72%);}\n.avatarWrap{position:relative;width:min(38vw,220px);height:min(36vh,260px);margin-bottom:6px;cursor:pointer;\n animation:idle 3.4s ease-in-out infinite;}\n.avatarWrap.poke{animation:idle 3.4s ease-in-out infinite, poke .5s ease-in-out;}\n@keyframes idle{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-5px) rotate(1deg);}}\n@keyframes poke{0%,100%{transform:scale(1) rotate(0deg);}30%{transform:scale(1.05) rotate(-3deg);}60%{transform:scale(.98) rotate(3deg);}}\n.avatarWrap svg{width:100%;height:100%;display:block;}\n#armR,#armL{transition:transform .4s ease;}\n#armR{transform-origin:168px 150px;}\n#armL{transform-origin:92px 150px;}\n.gesture-wave #armR{animation:wave 1.1s ease-in-out 2;}\n@keyframes wave{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-32deg);}}\n.gesture-open #armR{animation:openR .8s ease-out forwards;}\n.gesture-open #armL{animation:openL .8s ease-out forwards;}\n@keyframes openR{to{transform:rotate(-42deg);}}\n@keyframes openL{to{transform:rotate(42deg);}}\n.gesture-point #armR{animation:point .8s ease-out forwards;}\n@keyframes point{50%{transform:rotate(-72deg);}100%{transform:rotate(-56deg);}}\n.gesture-thumb #armR{animation:thumb .8s ease-out forwards;}\n@keyframes thumb{50%{transform:rotate(-95deg);}100%{transform:rotate(-82deg);}}\n.gesture-welcome #armR{animation:openR .8s ease-out forwards;}\n.gesture-welcome #armL{animation:openL .8s ease-out forwards;}\n\n.eyeGroup{transform-box:fill-box;transform-origin:center;animation:blink 4.5s ease-in-out infinite;}\n@keyframes blink{0%,92%,100%{transform:scaleY(1);}95%{transform:scaleY(.1);}}\n.pupil{transition:transform .12s ease-out;}\n#mouthClosed{opacity:1;}\n#mouthOpen{opacity:0;}\n.talking #mouthClosed{animation:flapC .28s steps(1) infinite;}\n.talking #mouthOpen{animation:flapO .28s steps(1) infinite;}\n@keyframes flapC{0%,100%{opacity:1;}50%{opacity:0;}}\n@keyframes flapO{0%,100%{opacity:0;}50%{opacity:1;}}\n\n.capBox{max-width:62ch;text-align:center;padding:0 6vw;min-height:4.6em;display:flex;align-items:center;justify-content:center;}\n.cap{color:var(--paper);font-size:clamp(1.02rem,2.7vw,1.4rem);line-height:1.55;font-family:'Fraunces',serif;font-weight:600;}\n.tapHint{color:#8FA6CC;font-size:.72rem;margin-top:2px;letter-spacing:.3px;}\n.brandRow{position:absolute;top:22px;left:0;right:0;text-align:center;color:var(--sky);letter-spacing:.4px;font-size:.85rem;}\n.bar{position:absolute;bottom:0;left:0;height:4px;background:var(--gold);width:0%;transition:width .1s linear;}\n.overlay{position:absolute;inset:0;background:rgba(11,27,58,.94);display:flex;flex-direction:column;\n align-items:center;justify-content:center;gap:16px;z-index:5;text-align:center;padding:0 8vw;}\n.overlay .brand{font-family:'Fraunces',serif;color:var(--paper);font-size:clamp(1.6rem,5vw,2.4rem);font-weight:700;}\n.tagline{color:var(--sky);letter-spacing:.5px;font-size:clamp(.85rem,2.2vw,1.05rem);}\n.playbtn{background:var(--gold);color:#1E1400;border:none;border-radius:999px;padding:14px 30px;\n font-family:'Inter',sans-serif;font-weight:600;font-size:1rem;cursor:pointer;margin-top:6px;}\n.playbtn:hover{filter:brightness(1.05);}\n.hint{color:#9FB3D8;font-size:.8rem;}\n.skip,.mute{position:absolute;top:16px;background:rgba(255,255,255,.08);color:#EFE7CE;border:1px solid rgba(255,255,255,.25);\n border-radius:6px;padding:8px 14px;font-size:.8rem;cursor:pointer;font-family:'Inter',sans-serif;z-index:6;display:none;}\n.skip{right:16px;} .mute{left:16px;}\n";
+      const INTRO_HTML = "<div class=\"stage\">\n  <div class=\"overlay\" id=\"overlay\">\n    <div class=\"brand\">Brain and Mind Academy</div>\n    <div class=\"tagline\">DISCOVER YOUR TRUE POTENTIAL</div>\n    <button class=\"playbtn\" id=\"playBtn\">\u25b6 Play introduction (with voice)</button>\n    <div class=\"hint\">About 55 seconds \u00b7 narrated by your browser's voice</div>\n  </div>\n\n  <button class=\"skip\" id=\"skip\">Replay</button>\n  <button class=\"mute\" id=\"muteBtn\">Mute</button>\n  <div class=\"brandRow\">BRAIN AND MIND ACADEMY</div>\n\n  <div class=\"avatarWrap\" id=\"avatarWrap\">\n    <svg viewBox=\"0 0 260 340\" xmlns=\"http://www.w3.org/2000/svg\">\n      <ellipse cx=\"130\" cy=\"322\" rx=\"70\" ry=\"12\" fill=\"#000\" opacity=\".18\"/>\n      <path d=\"M60 340 L64 210 Q130 190 196 210 L200 340 Z\" fill=\"var(--blazer)\"/>\n      <path d=\"M100 340 L104 225 L130 240 L156 225 L160 340 Z\" fill=\"var(--blouse)\"/>\n      <path d=\"M64 210 L40 300 L58 308 L86 222 Z\" fill=\"var(--blazerdk)\" id=\"armL\"/>\n      <path d=\"M196 210 L220 300 L202 308 L174 222 Z\" fill=\"var(--blazerdk)\" id=\"armR\"/>\n      <circle cx=\"130\" cy=\"140\" r=\"58\" fill=\"var(--skin)\"/>\n      <path d=\"M76 128 Q70 68 130 62 Q190 68 184 128 Q184 92 130 90 Q76 92 76 128Z\" fill=\"var(--hair)\"/>\n      <path d=\"M72 118 Q66 150 78 172 L86 168 Q76 145 80 120Z\" fill=\"var(--hair)\"/>\n      <path d=\"M188 118 Q194 150 182 172 L174 168 Q184 145 180 120Z\" fill=\"var(--hair)\"/>\n      <g id=\"eyeL\" class=\"eyeGroup\">\n        <ellipse cx=\"110\" cy=\"141\" rx=\"9\" ry=\"7\" fill=\"#fff\"/>\n        <circle class=\"pupil\" id=\"pupilL\" cx=\"110\" cy=\"141\" r=\"4\" fill=\"#2A1E18\"/>\n      </g>\n      <g id=\"eyeR\" class=\"eyeGroup\">\n        <ellipse cx=\"156\" cy=\"141\" rx=\"9\" ry=\"7\" fill=\"#fff\"/>\n        <circle class=\"pupil\" id=\"pupilR\" cx=\"156\" cy=\"141\" r=\"4\" fill=\"#2A1E18\"/>\n      </g>\n      <path d=\"M120 160 Q130 166 140 160\" stroke=\"#B8815F\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>\n      <g id=\"mouth\">\n        <path id=\"mouthClosed\" d=\"M114 178 Q130 184 146 178\" stroke=\"#8A4A3A\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\"/>\n        <ellipse id=\"mouthOpen\" cx=\"130\" cy=\"180\" rx=\"12\" ry=\"9\" fill=\"#7A3B2E\"/>\n      </g>\n    </svg>\n  </div>\n  <div class=\"tapHint\">tap her to say hello</div>\n\n  <div class=\"capBox\"><div class=\"cap\" id=\"cap\"></div></div>\n  <div class=\"bar\" id=\"bar\"></div>\n</div>";
+      const WALK_CSS = "\n:host{--navy:#0B1B3A;--navy2:#152C5C;--gold:#E9B949;--sky:#5FC7E0;--paper:#F6F3EA;\n --skin:#E8B994;--hair:#3B2A22;--blazer:#1F6F63;--blazerdk:#154F46;--blouse:#F3EADB;--teal2:#8FD9C4;--rust:#E27A5F;}\n*{box-sizing:border-box;}\n:host{display:block;height:100%;overflow:hidden;background:var(--navy);}\n.stage{font-family:'Inter',system-ui,sans-serif;}\n.stage{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;\n background:radial-gradient(ellipse at 50% 12%, var(--navy2), var(--navy) 72%); padding:10px 0;}\n.avatarWrap{position:relative;width:min(24vw,130px);height:min(30vh,180px);cursor:pointer;\n animation:idle 3.4s ease-in-out infinite;flex-shrink:0;}\n.avatarWrap.poke{animation:idle 3.4s ease-in-out infinite, poke .5s ease-in-out;}\n@keyframes idle{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-4px) rotate(1deg);}}\n@keyframes poke{0%,100%{transform:scale(1) rotate(0deg);}30%{transform:scale(1.05) rotate(-3deg);}60%{transform:scale(.98) rotate(3deg);}}\n.avatarWrap svg{width:100%;height:100%;display:block;}\n#armR,#armL{transition:transform .4s ease;}\n#armR{transform-origin:168px 150px;} #armL{transform-origin:92px 150px;}\n.gesture-wave #armR{animation:wave 1.1s ease-in-out 2;}\n@keyframes wave{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-32deg);}}\n.gesture-open #armR{animation:openR .8s ease-out forwards;} .gesture-open #armL{animation:openL .8s ease-out forwards;}\n@keyframes openR{to{transform:rotate(-42deg);}} @keyframes openL{to{transform:rotate(42deg);}}\n.gesture-point #armR{animation:point .8s ease-out forwards;}\n@keyframes point{50%{transform:rotate(-72deg);}100%{transform:rotate(-56deg);}}\n.gesture-thumb #armR{animation:thumb .8s ease-out forwards;}\n@keyframes thumb{50%{transform:rotate(-95deg);}100%{transform:rotate(-82deg);}}\n.eyeGroup{transform-box:fill-box;transform-origin:center;animation:blink 4.5s ease-in-out infinite;}\n@keyframes blink{0%,92%,100%{transform:scaleY(1);}95%{transform:scaleY(.1);}}\n.pupil{transition:transform .12s ease-out;}\n#mouthClosed{opacity:1;} #mouthOpen{opacity:0;}\n.talking #mouthClosed{animation:flapC .28s steps(1) infinite;} .talking #mouthOpen{animation:flapO .28s steps(1) infinite;}\n@keyframes flapC{0%,100%{opacity:1;}50%{opacity:0;}} @keyframes flapO{0%,100%{opacity:0;}50%{opacity:1;}}\n\n.panel{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;max-width:78ch;padding:0 6vw;}\n.icon{height:48px;display:flex;align-items:center;justify-content:center;}\n.icon svg{height:48px;}\n.ctitle{font-family:'Fraunces',serif;color:var(--paper);font-size:clamp(1.1rem,3vw,1.55rem);font-weight:700;margin:2px 0;text-align:center;}\n.cap{color:#C7D2E8;font-size:clamp(.85rem,2.2vw,1.05rem);line-height:1.5;text-align:center;max-width:64ch;}\n.chapterLabel{color:var(--sky);font-size:.72rem;letter-spacing:.4px;}\n.ctaRow{display:none;flex-direction:column;align-items:center;gap:6px;margin-top:8px;}\n.ctaBtn{background:var(--gold);color:#1E1400;border:none;border-radius:999px;padding:10px 22px;font-weight:600;\n font-size:.9rem;font-family:'Inter',sans-serif;cursor:pointer;text-decoration:none;}\n.ctaContact{color:#9FB3D8;font-size:.75rem;}\n.dots{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;justify-content:center;max-width:70vw;}\n.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.22);cursor:pointer;border:none;padding:0;}\n.dot.on{background:var(--gold);}\n.brandRow{position:absolute;top:16px;left:0;right:0;text-align:center;color:var(--sky);letter-spacing:.4px;font-size:.78rem;}\n.bar{position:absolute;bottom:0;left:0;height:4px;background:var(--gold);width:0%;transition:width .1s linear;}\n.overlay{position:absolute;inset:0;background:rgba(11,27,58,.94);display:flex;flex-direction:column;\n align-items:center;justify-content:center;gap:14px;z-index:5;text-align:center;padding:0 8vw;}\n.overlay .brand{font-family:'Fraunces',serif;color:var(--paper);font-size:clamp(1.5rem,4.6vw,2.2rem);font-weight:700;}\n.tagline{color:var(--sky);letter-spacing:.5px;font-size:clamp(.8rem,2.1vw,1rem);}\n.playbtn{background:var(--gold);color:#1E1400;border:none;border-radius:999px;padding:14px 30px;\n font-family:'Inter',sans-serif;font-weight:600;font-size:1rem;cursor:pointer;margin-top:6px;}\n.playbtn:hover{filter:brightness(1.05);}\n.hint{color:#9FB3D8;font-size:.78rem;}\n.hint2{color:#7488AE;font-size:.7rem;max-width:38ch;}\n.navRow{position:absolute;bottom:16px;display:none;gap:10px;}\n.navRow button, .skip,.mute{background:rgba(255,255,255,.08);color:#EFE7CE;border:1px solid rgba(255,255,255,.25);\n border-radius:6px;padding:7px 13px;font-size:.78rem;cursor:pointer;font-family:'Inter',sans-serif;}\n.skip,.mute{position:absolute;top:16px;z-index:6;display:none;}\n.skip{right:16px;} .mute{left:16px;}\n";
+      const WALK_HTML = "<div class=\"stage\">\n  <div class=\"overlay\" id=\"overlay\">\n    <div class=\"brand\">Brain and Mind Academy</div>\n    <div class=\"tagline\">REPORT WALKTHROUGH \u2014 GENERAL OVERVIEW</div>\n    <button class=\"playbtn\" id=\"playBtn\">\u25b6 Play walkthrough (with voice)</button>\n    <div class=\"hint\">About 2 minutes \u00b7 a general guide to what's in your report</div>\n    <div class=\"hint2\">Tip: Chrome or Edge include clearer, more natural browser voices.</div>\n  </div>\n\n  <button class=\"skip\" id=\"skip\">Replay</button>\n  <button class=\"mute\" id=\"muteBtn\">Mute</button>\n  <div class=\"brandRow\">BRAIN AND MIND ACADEMY</div>\n\n  <div class=\"avatarWrap\" id=\"avatarWrap\">\n    <svg viewBox=\"0 0 260 340\" xmlns=\"http://www.w3.org/2000/svg\">\n      <ellipse cx=\"130\" cy=\"322\" rx=\"70\" ry=\"12\" fill=\"#000\" opacity=\".18\"/>\n      <path d=\"M60 340 L64 210 Q130 190 196 210 L200 340 Z\" fill=\"var(--blazer)\"/>\n      <path d=\"M100 340 L104 225 L130 240 L156 225 L160 340 Z\" fill=\"var(--blouse)\"/>\n      <path d=\"M64 210 L40 300 L58 308 L86 222 Z\" fill=\"var(--blazerdk)\" id=\"armL\"/>\n      <path d=\"M196 210 L220 300 L202 308 L174 222 Z\" fill=\"var(--blazerdk)\" id=\"armR\"/>\n      <circle cx=\"130\" cy=\"140\" r=\"58\" fill=\"var(--skin)\"/>\n      <path d=\"M76 128 Q70 68 130 62 Q190 68 184 128 Q184 92 130 90 Q76 92 76 128Z\" fill=\"var(--hair)\"/>\n      <path d=\"M72 118 Q66 150 78 172 L86 168 Q76 145 80 120Z\" fill=\"var(--hair)\"/>\n      <path d=\"M188 118 Q194 150 182 172 L174 168 Q184 145 180 120Z\" fill=\"var(--hair)\"/>\n      <g id=\"eyeL\" class=\"eyeGroup\"><ellipse cx=\"110\" cy=\"141\" rx=\"9\" ry=\"7\" fill=\"#fff\"/><circle class=\"pupil\" id=\"pupilL\" cx=\"110\" cy=\"141\" r=\"4\" fill=\"#2A1E18\"/></g>\n      <g id=\"eyeR\" class=\"eyeGroup\"><ellipse cx=\"156\" cy=\"141\" rx=\"9\" ry=\"7\" fill=\"#fff\"/><circle class=\"pupil\" id=\"pupilR\" cx=\"156\" cy=\"141\" r=\"4\" fill=\"#2A1E18\"/></g>\n      <path d=\"M120 160 Q130 166 140 160\" stroke=\"#B8815F\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>\n      <g id=\"mouth\">\n        <path id=\"mouthClosed\" d=\"M114 178 Q130 184 146 178\" stroke=\"#8A4A3A\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\"/>\n        <ellipse id=\"mouthOpen\" cx=\"130\" cy=\"180\" rx=\"12\" ry=\"9\" fill=\"#7A3B2E\"/>\n      </g>\n    </svg>\n  </div>\n\n  <div class=\"panel\">\n    <div class=\"chapterLabel\" id=\"clabel\"></div>\n    <div class=\"icon\" id=\"icon\"></div>\n    <div class=\"ctitle\" id=\"ctitle\"></div>\n    <div class=\"cap\" id=\"cap\"></div>\n    <div class=\"ctaRow\" id=\"ctaRow\">\n      <a class=\"ctaBtn\" id=\"ctaBtn\" href=\"tel:9838793949\">Book Your Appointment</a>\n      <div class=\"ctaContact\">Call 9838793949 \u00b7 brainmindspn@gmail.com</div>\n    </div>\n  </div>\n  <div class=\"dots\" id=\"dots\"></div>\n  <div class=\"bar\" id=\"bar\"></div>\n  <div class=\"navRow\" id=\"navRow\">\n    <button id=\"prevBtn\">\u25c0 Previous</button>\n    <button id=\"nextBtn\">Next \u25b6</button>\n  </div>\n</div>";
+
+      function makeRoot(host, css, html) {
+        const root = host.attachShadow({ mode: 'open' });
+        root.innerHTML = `<style>${css}</style>${html}`;
+        return root;
+      }
+      function gaze(root, avatar) {
+        const pL = root.getElementById('pupilL'), pR = root.getElementById('pupilR');
+        const upd = (x, y) => {
+          const r = avatar.getBoundingClientRect(); if (!r.width) return;
+          const nx = Math.max(-2.4, Math.min(2.4, (x - (r.left + r.width * .5)) / 60));
+          const ny = Math.max(-1.6, Math.min(1.6, (y - (r.top + r.height * .42)) / 90));
+          const t = `translate(${nx}px, ${ny}px)`; pL.style.transform = t; pR.style.transform = t;
+        };
+        document.addEventListener('mousemove', e => upd(e.clientX, e.clientY));
+        document.addEventListener('touchmove', e => { if (e.touches[0]) upd(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+      }
+      // One narrated sentence. The caption always holds for at least minMs (reading
+      // pace), whether or not the browser's voice works; the voice plays on top when
+      // allowed. If the voice is blocked or never starts, the rest plays silently.
+      let voiceBroken = false;
+      function sayLine(text, minMs, isLive, isMuted, avatar, onVoiceFail, done) {
+        let clock = false, spoken = false, finished = false, began = false;
+        const fin = () => {
+          if (finished || !isLive()) return;
+          if (clock && spoken) { finished = true; avatar.classList.remove('talking'); done(); }
+        };
+        const silent = () => { if (isLive()) avatar.classList.add('talking'); spoken = true; fin(); };
+        const broke = () => { if (!voiceBroken) { voiceBroken = true; onVoiceFail(); } };
+        setTimeout(() => { clock = true; fin(); }, minMs);
+        if (!synth || voiceBroken || isMuted()) return silent();
+        try {
+          const u = new SpeechSynthesisUtterance(text);
+          if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-IN';
+          u.rate = 0.95; u.pitch = 1.1; u.volume = 1;
+          u.onstart = () => { began = true; if (isLive()) avatar.classList.add('talking'); };
+          u.onend = () => { if (isLive()) avatar.classList.remove('talking'); spoken = true; fin(); };
+          u.onerror = (e) => {
+            const benign = e && (e.error === 'interrupted' || e.error === 'canceled');
+            if (!benign) broke();
+            if (!spoken) silent();
+          };
+          try { synth.resume(); } catch (e) {}
+          synth.speak(u);
+          setTimeout(() => { if (!began && !spoken && isLive()) { broke(); try { synth.cancel(); } catch (e) {} silent(); } }, 4500);
+          setTimeout(() => { if (!spoken && isLive()) { spoken = true; fin(); } }, minMs * 2 + 6000);
+        } catch (e) { broke(); silent(); }
+      }
+      // Chrome drops speech queued in the same tick as cancel(), so wait a moment after cancelling.
+      function afterCancel(fn) {
+        if (synth && (synth.speaking || synth.pending)) { try { synth.cancel(); } catch (e) {} setTimeout(fn, 180); }
+        else fn();
+      }
+      const splitSentences = t => (t.match(/[^.!?]+[.!?]*/g) || [t]).map(x => x.trim()).filter(Boolean);
+      const readMs = t => Math.max(1400, t.split(/\s+/).length * 330);
+
+      function poke(avatar) { avatar.classList.remove('poke'); void avatar.offsetWidth; avatar.classList.add('poke'); }
+
+      // ---------------- Introduction player ----------------
+      function mountIntro(host, hooks) {
+        const root = makeRoot(host, INTRO_CSS, INTRO_HTML);
+        const g = id => root.getElementById(id);
+        const overlay = g('overlay'), playBtn = g('playBtn'), skipBtn = g('skip'), muteBtn = g('muteBtn'),
+          bar = g('bar'), capEl = g('cap'), avatar = g('avatarWrap');
+        const CAPTIONS = [
+          "Hi, I'm here to walk you through your Brain and Mind Academy report. Let's discover your true potential, together.",
+          "This report is your Comprehensive Psychometric and Cognitive Profile, built from three assessments: your Multiple Intelligence Indicator, your Visual, Auditory, and Kinesthetic learning style, and your brain dominance profile.",
+          "Inside, you'll find your full eight-intelligence breakdown, your learning style and brain dominance scale, a personal strengths and weaknesses analysis, and career pathways matched to how you think.",
+          "Every section ends with actionable tips: small, practical habits to help you study smarter and grow your natural strengths.",
+          "There are no right or wrong answers here, just a clearer picture of how you learn best. We will take you where you can. Let's begin."
+        ];
+        const GESTURES = ['gesture-wave','gesture-open','gesture-point','gesture-thumb','gesture-welcome'];
+        let muted = false, started = false, gen = 0, timer = null;
+        const setGesture = n => { GESTURES.forEach(x => avatar.classList.remove(x)); void avatar.offsetWidth; avatar.classList.add(n); };
+        const runBar = ms => { bar.style.transition = 'none'; bar.style.width = '0%'; requestAnimationFrame(() => { bar.style.transition = 'width ' + (ms / 1000) + 's linear'; bar.style.width = '100%'; }); };
+        function speakLine(i) {
+          const my = ++gen; clearTimeout(timer);
+          const live = () => my === gen;
+          hooks.onProgress(Math.min(i, CAPTIONS.length), CAPTIONS.length);
+          if (i >= CAPTIONS.length) { bar.style.width = '100%'; avatar.classList.remove('talking'); hooks.onDone(); return; }
+          capEl.textContent = CAPTIONS[i]; setGesture(GESTURES[i]);
+          const parts = splitSentences(CAPTIONS[i]);
+          runBar(parts.reduce((a, t) => a + readMs(t), 0));
+          let k = 0;
+          const nextPart = () => {
+            if (!live()) return;
+            if (k >= parts.length) { timer = setTimeout(() => { if (live()) speakLine(i + 1); }, 350); return; }
+            const t = parts[k++];
+            sayLine(t, readMs(t), live, () => muted, avatar, hooks.onVoiceFail, nextPart);
+          };
+          afterCancel(nextPart);
+        }
+        function start() { overlay.style.display = 'none'; skipBtn.style.display = 'block'; muteBtn.style.display = 'block'; started = true; speakLine(0); }
+        playBtn.addEventListener('click', start);
+        skipBtn.addEventListener('click', () => speakLine(0));
+        muteBtn.addEventListener('click', () => { muted = !muted; muteBtn.textContent = muted ? 'Unmute' : 'Mute'; if (muted && synth) synth.cancel(); });
+        avatar.addEventListener('click', () => { poke(avatar); if (!started) start(); });
+        gaze(root, avatar);
+        return {
+          stop() { gen++; clearTimeout(timer); if (synth) synth.cancel(); avatar.classList.remove('talking'); },
+          reset() { this.stop(); started = false; overlay.style.display = 'flex'; skipBtn.style.display = 'none'; muteBtn.style.display = 'none'; capEl.textContent = ''; bar.style.transition = 'none'; bar.style.width = '0%'; }
+        };
+      }
+
+      // ---------------- Report walkthrough player ----------------
+      function mountWalk(host, hooks) {
+        const root = makeRoot(host, WALK_CSS, WALK_HTML);
+        const g = id => root.getElementById(id);
+        const overlay = g('overlay'), playBtn = g('playBtn'), skipBtn = g('skip'), muteBtn = g('muteBtn'),
+          bar = g('bar'), capEl = g('cap'), titleEl = g('ctitle'), labelEl = g('clabel'), iconEl = g('icon'),
+          avatar = g('avatarWrap'), dotsEl = g('dots'), navRow = g('navRow'), prevBtn = g('prevBtn'), nextBtn = g('nextBtn'), ctaRow = g('ctaRow');
+        const ICONS = {
+blank:'',
+three:'<svg viewBox="0 0 120 60"><circle cx="20" cy="30" r="16" fill="var(--sky)"/><circle cx="60" cy="30" r="16" fill="var(--gold)"/><circle cx="100" cy="30" r="16" fill="var(--teal2)"/></svg>',
+eight:'<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="40" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/>'+
+ [[102,60],[89.7,89.7],[60,102],[30.3,89.7],[18,60],[30.3,30.3],[60,18],[89.7,30.3]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="var(--gold)"/>`).join('')+'</svg>',
+vak:'<svg viewBox="0 0 150 60"><ellipse cx="25" cy="30" rx="16" ry="10" fill="none" stroke="var(--sky)" stroke-width="3"/><circle cx="25" cy="30" r="4" fill="var(--sky)"/><path d="M70 15 Q90 15 90 35 Q90 50 75 50" stroke="var(--gold)" stroke-width="3" fill="none"/><rect x="110" y="15" width="26" height="34" rx="8" fill="none" stroke="var(--teal2)" stroke-width="3"/></svg>',
+brain:'<svg viewBox="0 0 120 120"><path d="M60 10 A50 50 0 0 0 60 110 Z" fill="var(--sky)"/><path d="M60 10 A50 50 0 0 1 60 110 Z" fill="var(--gold)"/></svg>',
+swot:'<svg viewBox="0 0 120 120"><rect x="6" y="6" width="50" height="50" fill="var(--sky)" opacity=".85"/><rect x="64" y="6" width="50" height="50" fill="var(--gold)" opacity=".85"/><rect x="6" y="64" width="50" height="50" fill="var(--teal2)" opacity=".85"/><rect x="64" y="64" width="50" height="50" fill="var(--rust)" opacity=".85"/></svg>',
+career:'<svg viewBox="0 0 120 90"><rect x="20" y="30" width="80" height="50" rx="8" fill="var(--gold)"/><rect x="45" y="14" width="30" height="20" rx="6" fill="none" stroke="var(--gold)" stroke-width="4"/><rect x="20" y="50" width="80" height="8" fill="var(--navy)"/></svg>',
+people:'<svg viewBox="0 0 120 90"><circle cx="40" cy="30" r="16" fill="var(--sky)"/><path d="M18 80 Q40 50 62 80Z" fill="var(--sky)"/><circle cx="82" cy="30" r="16" fill="var(--gold)"/><path d="M60 80 Q82 50 104 80Z" fill="var(--gold)"/></svg>',
+star:'<svg viewBox="0 0 100 100"><polygon points="50,8 61,38 93,38 67,57 76,88 50,68 24,88 33,57 7,38 39,38" fill="var(--gold)"/></svg>',
+calendar:'<svg viewBox="0 0 100 100"><rect x="10" y="22" width="80" height="66" rx="8" fill="none" stroke="var(--gold)" stroke-width="4"/><rect x="10" y="22" width="80" height="18" fill="var(--gold)"/><line x1="30" y1="10" x2="30" y2="30" stroke="var(--gold)" stroke-width="4"/><line x1="70" y1="10" x2="70" y2="30" stroke="var(--gold)" stroke-width="4"/><circle cx="35" cy="62" r="5" fill="var(--gold)"/><circle cx="65" cy="62" r="5" fill="var(--gold)"/><circle cx="50" cy="76" r="5" fill="var(--gold)"/></svg>'
+};
+        const SCENES = [
+ {label:'Welcome', title:'Welcome', gesture:'gesture-wave', icon:'blank',
+  text:"Hi, I'm here to walk you through your Brain and Mind Academy report. This is a general overview of what it measures and how to read it."},
+ {label:'Chapter 1 of 7', title:'Three assessments, one profile', gesture:'gesture-open', icon:'three',
+  text:"This report combines three assessments. The Multiple Intelligence Indicator. The Visual, Auditory, and Kinesthetic learning style assessment. And the Brain Dominance profile."},
+ {label:'Chapter 2 of 7', title:'Eight kinds of smart', gesture:'gesture-point', icon:'eight',
+  text:"Dr. Howard Gardner's theory says people process the world through eight intelligences. Linguistic, Logical-Mathematical, Visual-Spatial, Musical, Kinesthetic, Interpersonal, Intrapersonal, and Naturalist. Your report ranks how strong each one is for you."},
+ {label:'Chapter 3 of 7', title:'How you take in information', gesture:'gesture-open', icon:'vak',
+  text:"The Visual, Auditory, and Kinesthetic assessment shows whether you learn best by seeing, by listening, or by doing. That helps you match your study habits to your natural style."},
+ {label:'Chapter 4 of 7', title:'Left brain, right brain', gesture:'gesture-point', icon:'brain',
+  text:"The Brain Dominance scale shows your balance between structured, logical left-brain thinking and creative, big-picture right-brain thinking. Most people lean one way more than the other."},
+ {label:'Chapter 5 of 7', title:'Strengths, weaknesses, opportunities, threats', gesture:'gesture-thumb', icon:'swot',
+  text:"A SWOT analysis brings all three assessments together. It names your strengths, the areas to watch, the opportunities your profile opens up, and the environments that might suit you less well."},
+ {label:'Chapter 6 of 7', title:'Subjects and careers matched to you', gesture:'gesture-open', icon:'career',
+  text:"Based on your combined results, the report suggests subject combinations for senior school. And career pathways where your natural strengths are likely to shine."},
+ {label:'Chapter 7 of 7', title:'For your personal results', gesture:'gesture-point', icon:'people',
+  text:"This video is a general guide to the report's structure. For what your own scores mean, and how to act on them, a Brain and Mind counsellor will go through your individual profile with you."},
+ {label:'Next Step', title:'Book your counselling session', gesture:'gesture-wave', icon:'calendar', cta:true,
+  text:"For a detailed understanding of your report, and to get the very best use of your assessment, connect with a Brain and Mind counsellor. Book your appointment today. We will help you bring out the best version of yourself."}
+];
+        const GESTURES = ['gesture-wave','gesture-open','gesture-point','gesture-thumb'];
+        let cur = 0, muted = false, started = false, gen = 0, timer = null;
+        const done = new Set();
+        const firstOpen = () => { let k = 0; while (done.has(k)) k++; return k; };   // furthest scene they may jump to
+        dotsEl.innerHTML = SCENES.map((_, i) => `<button class="dot" data-i="${i}" aria-label="Chapter ${i + 1}"></button>`).join('');
+        const dotEls = Array.from(dotsEl.querySelectorAll('.dot'));
+        function paintDots() {
+          const lim = firstOpen();
+          dotEls.forEach((d, j) => { d.classList.toggle('on', j === cur); d.style.opacity = j <= lim ? '1' : '.35'; d.style.cursor = j <= lim ? 'pointer' : 'not-allowed'; });
+          nextBtn.disabled = cur + 1 > lim || cur >= SCENES.length - 1;
+          nextBtn.style.opacity = nextBtn.disabled ? '.4' : '1';
+          nextBtn.title = nextBtn.disabled && cur < SCENES.length - 1 ? 'Finish this chapter first' : '';
+        }
+        const setGesture = n => { GESTURES.forEach(x => avatar.classList.remove(x)); void avatar.offsetWidth; avatar.classList.add(n); };
+        const runBar = ms => { bar.style.transition = 'none'; bar.style.width = '0%'; requestAnimationFrame(() => { bar.style.transition = 'width ' + (ms / 1000) + 's linear'; bar.style.width = '100%'; }); };
+        function finishScene(i) {
+          done.add(i);
+          hooks.onProgress(done.size, SCENES.length);
+          if (done.size === SCENES.length) hooks.onDone();
+        }
+        function speakScene(i) {
+          const my = ++gen; clearTimeout(timer);
+          const live = () => my === gen;
+          if (i >= SCENES.length) { avatar.classList.remove('talking'); bar.style.width = '100%'; paintDots(); return; }
+          cur = i;
+          const sc = SCENES[i];
+          labelEl.textContent = sc.label; titleEl.textContent = sc.title; capEl.textContent = sc.text;
+          iconEl.innerHTML = ICONS[sc.icon] || '';
+          ctaRow.style.display = sc.cta ? 'flex' : 'none';
+          setGesture(sc.gesture); paintDots();
+          const parts = splitSentences(sc.text);
+          runBar(parts.reduce((a, t) => a + readMs(t), 0));
+          let k = 0;
+          const nextPart = () => {
+            if (!live()) return;
+            if (k >= parts.length) { finishScene(i); timer = setTimeout(() => { if (live()) speakScene(i + 1); }, 450); return; }
+            const t = parts[k++];
+            sayLine(t, readMs(t), live, () => muted, avatar, hooks.onVoiceFail, nextPart);
+          };
+          afterCancel(nextPart);
+        }
+        function jumpTo(i) {
+          i = Math.max(0, Math.min(SCENES.length - 1, i));
+          if (i > firstOpen()) { hooks.onBlocked(); return; }
+          speakScene(i);
+        }
+        function start() { overlay.style.display = 'none'; skipBtn.style.display = 'block'; muteBtn.style.display = 'block'; navRow.style.display = 'flex'; started = true; speakScene(0); }
+        dotEls.forEach(d => d.addEventListener('click', () => jumpTo(parseInt(d.dataset.i, 10))));
+        playBtn.addEventListener('click', start);
+        skipBtn.addEventListener('click', () => jumpTo(0));
+        prevBtn.addEventListener('click', () => jumpTo(cur - 1));
+        nextBtn.addEventListener('click', () => jumpTo(cur + 1));
+        muteBtn.addEventListener('click', () => { muted = !muted; muteBtn.textContent = muted ? 'Unmute' : 'Mute'; if (muted && synth) synth.cancel(); });
+        avatar.addEventListener('click', () => { poke(avatar); if (!started) start(); });
+        gaze(root, avatar);
+        return {
+          stop() { gen++; clearTimeout(timer); if (synth) synth.cancel(); avatar.classList.remove('talking'); },
+          reset(alreadyWatched) {
+            this.stop(); started = false; done.clear();
+            if (alreadyWatched) SCENES.forEach((_, i) => done.add(i));
+            cur = 0; overlay.style.display = 'flex'; skipBtn.style.display = 'none'; muteBtn.style.display = 'none'; navRow.style.display = 'none';
+            ctaRow.style.display = 'none'; bar.style.transition = 'none'; bar.style.width = '0%'; paintDots();
+          }
+        };
+      }
+
+      // ---------------- Modal shell ----------------
+      let modalKind = null, players = {}, afterIntro = null;
+      function openModal(kind) {
+        modalKind = kind;
+        const m = $('video-modal');
+        const intro = kind === 'intro';
+        $('video-modal-eyebrow').textContent = intro ? 'Before you begin' : 'Final step · Report walkthrough';
+        $('video-modal-title').textContent = intro ? 'Watch the introduction' : 'Watch your report walkthrough';
+        if (!players[kind]) {
+          const host = $(intro ? 'video-host-intro' : 'video-host-walk');
+          const hooks = {
+            onProgress: (n, t) => setProgress(n, t),
+            onDone: () => markWatched(kind),
+            onVoiceFail: () => { $('video-modal-note').hidden = false; },
+            onBlocked: () => showToast('Please finish this chapter first. The report download unlocks after the full walkthrough.', 'warning')
+          };
+          players[kind] = intro ? mountIntro(host, hooks) : mountWalk(host, hooks);
+        }
+        $('video-host-intro').hidden = !intro;
+        $('video-host-walk').hidden = intro;
+        const watched = intro ? !!B.introWatched : !!B.walkthroughWatched;
+        players[kind].reset(watched);
+        $('video-modal-note').hidden = true;
+        setProgress(watched ? 1 : 0, 1);
+        paintFooter();
+        m.hidden = false;
+        document.documentElement.style.overflow = 'hidden';
+      }
+      function closeModal() {
+        if (modalKind && players[modalKind]) players[modalKind].stop();
+        $('video-modal').hidden = true;
+        document.documentElement.style.overflow = '';
+        modalKind = null;
+      }
+      function setProgress(n, t) {
+        const pct = t ? Math.round((n / t) * 100) : 0;
+        $('video-modal-bar').style.width = pct + '%';
+      }
+      function paintFooter() {
+        const intro = modalKind === 'intro';
+        const watched = intro ? !!B.introWatched : !!B.walkthroughWatched;
+        const btn = $('video-modal-primary');
+        btn.disabled = !watched;
+        btn.innerHTML = intro
+          ? (watched ? '<span>Start the assessment</span><i class="fa-solid fa-arrow-right"></i>' : '<i class="fa-solid fa-lock"></i><span>Start the assessment</span>')
+          : (watched ? '<i class="fa-solid fa-file-arrow-down"></i><span>Download my report</span>' : '<i class="fa-solid fa-lock"></i><span>Download my report</span>');
+        $('video-modal-status').textContent = watched
+          ? (intro ? 'Introduction complete. You can begin.' : 'Walkthrough complete. Your report download is unlocked.')
+          : (intro ? 'Press play and watch to the end to unlock the assessment.' : 'Press play and watch every chapter to unlock the PDF download.');
+        $('video-modal-status').className = 'text-xs font-semibold ' + (watched ? 'text-emerald-700' : 'text-slate-500');
+        $('video-modal-close').textContent = intro ? 'Back to details' : 'Close';
+      }
+      function markWatched(kind) {
+        if (kind === 'intro') B.introWatched = true; else B.walkthroughWatched = true;
+        if (typeof B.save === 'function') B.save();
+        setProgress(1, 1);
+        paintFooter();
+        paintReportLock();
+        showToast(kind === 'intro' ? 'Introduction complete. You can start the assessment.' : 'Walkthrough complete. Your PDF download is unlocked.', 'success');
+      }
+
+      $('video-modal-close').addEventListener('click', closeModal);
+      $('video-modal-primary').addEventListener('click', () => {
+        const kind = modalKind;
+        closeModal();
+        if (kind === 'intro') { const t = afterIntro || 'mi'; afterIntro = null; switchMainTab(t); }
+        else downloadFullPDFReport();
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalKind) closeModal(); });
+
+      // ---------------- Gates ----------------
+      const GATED = ['mi', 'vak', 'brain', 'report'];
+      const origSwitch = window.switchMainTab;
+      window.switchMainTab = function (tab) {
+        if (GATED.includes(tab) && !B.introWatched && !B.restoring) {
+          afterIntro = tab;
+          origSwitch.call(this, 'profile');
+          const f = $('student-form');
+          if (f && !f.checkValidity()) { f.reportValidity(); showToast('Please fill in your details first, then watch the introduction.', 'warning'); return; }
+          openModal('intro');
+          return;
+        }
+        if (GATED.includes(tab) && !B.introWatched && B.restoring) tab = 'profile';
+        const r = origSwitch.apply(this, [tab].concat([].slice.call(arguments, 1)));
+        paintReportLock();
+        return r;
+      };
+
+      const origDownload = window.downloadFullPDFReport;
+      window.downloadFullPDFReport = function () {
+        if (!B.walkthroughWatched) {
+          showToast('Watch the report walkthrough to unlock your PDF download.', 'warning');
+          openModal('walk');
+          return;
+        }
+        return origDownload.apply(this, arguments);
+      };
+
+      function paintReportLock() {
+        const w = !!B.walkthroughWatched;
+        const banner = $('walk-banner');
+        if (banner) {
+          banner.className = 'rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 no-print ' + (w ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-900 border-slate-800');
+          $('walk-banner-icon').className = 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ' + (w ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-slate-900');
+          $('walk-banner-icon').innerHTML = w ? '<i class="fa-solid fa-lock-open"></i>' : '<i class="fa-solid fa-circle-play"></i>';
+          $('walk-banner-title').className = 'text-sm font-bold ' + (w ? 'text-emerald-950' : 'text-white');
+          $('walk-banner-title').textContent = w ? 'Report download unlocked' : 'Watch the report walkthrough to unlock your download';
+          $('walk-banner-text').className = 'text-xs leading-relaxed ' + (w ? 'text-emerald-900/80' : 'text-slate-300');
+          $('walk-banner-text').textContent = w
+            ? 'You have watched the walkthrough. Download your complete report any time, or watch the walkthrough again.'
+            : 'A short, narrated guide (about 2 minutes) explains each part of your report. The PDF download unlocks when it finishes.';
+          $('walk-banner-btn').className = 'px-4 py-2 rounded-xl text-xs font-bold shrink-0 flex items-center gap-2 ' + (w ? 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100' : 'bg-amber-400 hover:bg-amber-300 text-slate-900');
+          $('walk-banner-btn').innerHTML = w ? '<i class="fa-solid fa-rotate-left"></i><span>Watch again</span>' : '<i class="fa-solid fa-play"></i><span>Watch walkthrough</span>';
+        }
+        document.querySelectorAll('[data-pdf-btn]').forEach(b => {
+          const lock = b.querySelector('.pdf-lock');
+          if (lock) lock.classList.toggle('hidden', w);
+          b.title = w ? '' : 'Unlocks after the report walkthrough';
+        });
+      }
+      B.paintLocks = paintReportLock;
+      $('walk-banner-btn').addEventListener('click', () => openModal('walk'));
+      paintReportLock();
+    })();
+  </script>
+</div>
